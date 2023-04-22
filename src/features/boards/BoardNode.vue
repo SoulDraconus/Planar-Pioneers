@@ -108,7 +108,10 @@
                 />
             </g>
 
-            <text :fill="titleColor" class="node-title">{{ title }}</text>
+            <text :fill="titleColor" class="node-title" :y="subtitle ? 10 : 0">{{ title }}</text>
+            <text v-if="subtitle" :fill="titleColor" class="node-subtitle" y="-15">{{
+                subtitle
+            }}</text>
         </g>
 
         <transition name="fade" appear>
@@ -204,6 +207,7 @@ const position = computed(() => {
 
 const shape = computed(() => getNodeProperty(props.nodeType.value.shape, unref(props.node)));
 const title = computed(() => getNodeProperty(props.nodeType.value.title, unref(props.node)));
+const subtitle = computed(() => getNodeProperty(props.nodeType.value.subtitle, unref(props.node)));
 const label = computed(() => getNodeProperty(props.nodeType.value.label, unref(props.node)));
 const size = computed(() => getNodeProperty(props.nodeType.value.size, unref(props.node)));
 const progress = computed(
@@ -277,6 +281,14 @@ function mouseUp(e: MouseEvent | TouchEvent) {
     dominant-baseline: middle;
     font-family: monospace;
     font-size: 200%;
+    pointer-events: none;
+}
+
+.node-subtitle {
+    text-anchor: middle;
+    dominant-baseline: middle;
+    font-family: monospace;
+    font-size: 150%;
     pointer-events: none;
 }
 

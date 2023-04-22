@@ -1,3 +1,4 @@
+import StickyVue from "components/layout/Sticky.vue";
 import {
     BoardNode,
     ProgressDisplay,
@@ -7,17 +8,25 @@ import {
 } from "features/boards/board";
 import { jsx } from "features/feature";
 import MainDisplay from "features/resources/MainDisplay.vue";
-import { createResource } from "features/resources/resource";
+import { createResource, displayResource } from "features/resources/resource";
+import TooltipVue from "features/tooltips/Tooltip.vue";
 import Formula, { calculateCost } from "game/formulas/formulas";
 import type { BaseLayer, GenericLayer } from "game/layers";
 import { createLayer } from "game/layers";
+import {
+    createModifierSection,
+    createMultiplicativeModifier,
+    createSequentialModifier
+} from "game/modifiers";
 import { State } from "game/persistence";
 import type { Player } from "game/player";
 import player from "game/player";
 import Decimal, { DecimalSource } from "lib/break_eternity";
-import { format, formatTime } from "util/bignum";
+import { format, formatTime, formatWhole } from "util/bignum";
+import { Direction } from "util/common";
 import { render } from "util/vue";
 import { ComputedRef, computed, reactive } from "vue";
+import "./main.css";
 
 export interface ResourceState {
     type: Resources;
@@ -52,13 +61,21 @@ export const main = createLayer("main", function (this: BaseLayer) {
     const energy = createResource<DecimalSource>(0, "energy");
 
     const resourceLevelFormula = Formula.variable(0).add(1);
-    function getResourceLevel(amount: DecimalSource) {
-        const currentLevel = Decimal.floor(
-            resourceLevelFormula.invertIntegral(
-                Decimal.add(amount, resourceLevelFormula.evaluateIntegral())
-            )
-        );
-        // TODO sum last x purchases?
+    function getResourceLevelProgress(amount: DecimalSource) {
+        // Sub 10 and then manually sum until we go over amount
+        let currentLevel = Decimal.floor(resourceLevelFormula.invertIntegral(amount))
+            .sub(10)
+            .clampMin(0);
+        let summedCost = calculateCost(resourceLevelFormula, currentLevel, true, 0);
+        while (true) {
+            const nextCost = resourceLevelFormula.evaluate(currentLevel);
+            if (Decimal.add(summedCost, nextCost).lte(amount)) {
+                currentLevel = currentLevel.add(1);
+                summedCost = Decimal.add(summedCost, nextCost);
+            } else {
+                break;
+            }
+        }
         const requiredForCurrentLevel = calculateCost(resourceLevelFormula, currentLevel, true);
         const requiredForNextLevel = calculateCost(
             resourceLevelFormula,
@@ -66,6 +83,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
             true
         );
         return Decimal.sub(amount, requiredForCurrentLevel)
+            .max(0)
             .div(Decimal.sub(requiredForNextLevel, requiredForCurrentLevel))
             .toNumber();
     }
@@ -91,7 +109,9 @@ export const main = createLayer("main", function (this: BaseLayer) {
                 shape: Shape.Circle,
                 size: 50,
                 title: node => (node.state as unknown as ResourceState).type,
-                progress: node => getResourceLevel((node.state as unknown as ResourceState).amount),
+                subtitle: node => formatWhole((node.state as unknown as ResourceState).amount),
+                progress: node =>
+                    getResourceLevelProgress((node.state as unknown as ResourceState).amount),
                 progressDisplay: ProgressDisplay.Outline,
                 progressColor: "var(--accent3)",
                 draggable: true
@@ -152,6 +172,38 @@ export const main = createLayer("main", function (this: BaseLayer) {
     const sumMineWeights = (Object.values(mineLootTable) as number[]).reduce((a, b) => a + b);
     const resourceNames = Object.keys(mineLootTable) as Resources[];
 
+    const energyModifier = createSequentialModifier(() =>
+        resourceNames.map(resource =>
+            createMultiplicativeModifier(() => ({
+                description: resource,
+                multiplier: () =>
+                    Decimal.pow(
+                        1.01,
+                        resourceLevelFormula.invertIntegral(
+                            (resourceNodes.value[resource]?.state as ResourceState | undefined)
+                                ?.amount ?? 0
+                        )
+                    ),
+                enabled: () =>
+                    resource in resourceNodes.value &&
+                    Decimal.gt(
+                        (resourceNodes.value[resource].state as ResourceState | undefined)
+                            ?.amount ?? 0,
+                        0
+                    )
+            }))
+        )
+    );
+    const computedEnergyModifier = computed(() => energyModifier.apply(1));
+    const energyGainTooltip = jsx(() =>
+        createModifierSection({
+            title: "Energy Gain",
+            modifier: energyModifier,
+            base: 1,
+            unit: "/s"
+        })
+    );
+
     this.on("preUpdate", diff => {
         Object.keys(resourceMinedCooldown).forEach(resource => {
             // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
@@ -196,7 +248,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
             }
         }
 
-        // TODO increment energy based on its modifier
+        energy.value = Decimal.add(energy.value, Decimal.times(computedEnergyModifier.value, diff));
     });
 
     return {
@@ -213,6 +265,21 @@ export const main = createLayer("main", function (this: BaseLayer) {
                     <div>Offline Time: {formatTime(player.offlineTime)}</div>
                 ) : null}
                 <MainDisplay resource={energy} />
+                <StickyVue style="margin-top: -20px">
+                    You are gaining{" "}
+                    <span class="tooltip-inline-container">
+                        <TooltipVue
+                            display={energyGainTooltip}
+                            direction={Direction.Down}
+                            style="width: 200px; text-align: left"
+                        >
+                            <h3 style="color: white; text-shadow: 0px 0px 10px white;">
+                                {displayResource(energy, computedEnergyModifier.value)}
+                            </h3>
+                        </TooltipVue>
+                    </span>{" "}
+                    energy/sec{" "}
+                </StickyVue>
                 {render(board)}
             </>
         ))

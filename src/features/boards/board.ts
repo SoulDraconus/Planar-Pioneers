@@ -88,6 +88,8 @@ export type BoardData = {
 export interface NodeTypeOptions {
     /** The title to display for the node. */
     title: NodeComputable<string>;
+    /** The subtitle to display for the node. */
+    subtitle?: NodeComputable<string>;
     /** An optional label for the node. */
     label?: NodeComputable<NodeLabel | null>;
     /** The size of the node - diameter for circles, width and height for squares. */
@@ -135,6 +137,7 @@ export type NodeType<T extends NodeTypeOptions> = Replace<
     T & BaseNodeType,
     {
         title: GetComputableType<T["title"]>;
+        subtitle: GetComputableType<T["subtitle"]>;
         label: GetComputableType<T["label"]>;
         size: GetComputableTypeWithDefault<T["size"], 50>;
         draggable: GetComputableTypeWithDefault<T["draggable"], false>;
@@ -375,6 +378,7 @@ export function createBoard<T extends BoardOptions>(
             const nodeType: NodeTypeOptions & Partial<BaseNodeType> = board.types[type];
 
             processComputable(nodeType as NodeTypeOptions, "title");
+            processComputable(nodeType as NodeTypeOptions, "subtitle");
             processComputable(nodeType as NodeTypeOptions, "label");
             processComputable(nodeType as NodeTypeOptions, "size");
             setDefault(nodeType, "size", 50);

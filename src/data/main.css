@@ -1,0 +1,4 @@
+.tooltip-inline-container,
+.tooltip-inline-container > .tooltip-container {
+    display: inline;
+}
