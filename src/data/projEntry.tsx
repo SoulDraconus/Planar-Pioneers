@@ -1,3 +1,4 @@
+import Modal from "components/Modal.vue";
 import StickyVue from "components/layout/Sticky.vue";
 import {
     BoardNode,
@@ -7,26 +8,26 @@ import {
     getUniqueNodeID
 } from "features/boards/board";
 import { jsx } from "features/feature";
-import MainDisplay from "features/resources/MainDisplay.vue";
 import { createResource, displayResource } from "features/resources/resource";
-import TooltipVue from "features/tooltips/Tooltip.vue";
+import { createTabFamily } from "features/tabs/tabFamily";
 import Formula, { calculateCost } from "game/formulas/formulas";
 import type { BaseLayer, GenericLayer } from "game/layers";
 import { createLayer } from "game/layers";
-import {
-    createModifierSection,
-    createMultiplicativeModifier,
-    createSequentialModifier
-} from "game/modifiers";
+import { createMultiplicativeModifier, createSequentialModifier } from "game/modifiers";
 import { State } from "game/persistence";
 import type { Player } from "game/player";
 import player from "game/player";
 import Decimal, { DecimalSource } from "lib/break_eternity";
-import { format, formatTime, formatWhole } from "util/bignum";
-import { Direction } from "util/common";
+import { format, formatWhole } from "util/bignum";
+import { camelToTitle } from "util/common";
 import { render } from "util/vue";
-import { ComputedRef, computed, reactive } from "vue";
+import { ComputedRef, computed, nextTick, reactive, ref, watch } from "vue";
+import { useToast } from "vue-toastification";
+import { createCollapsibleModifierSections } from "./common";
 import "./main.css";
+import settings from "game/settings";
+
+const toast = useToast();
 
 export interface ResourceState {
     type: Resources;
@@ -61,21 +62,44 @@ export const main = createLayer("main", function (this: BaseLayer) {
     const energy = createResource<DecimalSource>(0, "energy");
 
     const resourceLevelFormula = Formula.variable(0).add(1);
-    function getResourceLevelProgress(amount: DecimalSource) {
-        // Sub 10 and then manually sum until we go over amount
-        let currentLevel = Decimal.floor(resourceLevelFormula.invertIntegral(amount))
-            .sub(10)
-            .clampMin(0);
-        let summedCost = calculateCost(resourceLevelFormula, currentLevel, true, 0);
-        while (true) {
-            const nextCost = resourceLevelFormula.evaluate(currentLevel);
-            if (Decimal.add(summedCost, nextCost).lte(amount)) {
-                currentLevel = currentLevel.add(1);
-                summedCost = Decimal.add(summedCost, nextCost);
-            } else {
-                break;
+
+    const resourceNodes: ComputedRef<Record<Resources, BoardNode>> = computed(() =>
+        board.nodes.value.reduce((acc, curr) => {
+            if (curr.type === "resource") {
+                acc[(curr.state as unknown as ResourceState).type] = curr;
             }
-        }
+            return acc;
+        }, {} as Record<Resources, BoardNode>)
+    );
+
+    const resourceLevels = computed(() =>
+        resourceNames.reduce((acc, curr) => {
+            const amount =
+                (resourceNodes.value[curr]?.state as unknown as ResourceState | undefined)
+                    ?.amount ?? 0;
+            // Sub 10 and then manually sum until we go over amount
+            let currentLevel = Decimal.floor(resourceLevelFormula.invertIntegral(amount))
+                .sub(10)
+                .clampMin(0);
+            let summedCost = calculateCost(resourceLevelFormula, currentLevel, true, 0);
+            while (true) {
+                const nextCost = resourceLevelFormula.evaluate(currentLevel);
+                if (Decimal.add(summedCost, nextCost).lte(amount)) {
+                    currentLevel = currentLevel.add(1);
+                    summedCost = Decimal.add(summedCost, nextCost);
+                } else {
+                    break;
+                }
+            }
+            acc[curr] = currentLevel;
+            return acc;
+        }, {} as Record<Resources, DecimalSource>)
+    );
+    function getResourceLevelProgress(resource: Resources) {
+        const amount =
+            (resourceNodes.value[resource]?.state as unknown as ResourceState | undefined)
+                ?.amount ?? 0;
+        const currentLevel = resourceLevels.value[resource];
         const requiredForCurrentLevel = calculateCost(resourceLevelFormula, currentLevel, true);
         const requiredForNextLevel = calculateCost(
             resourceLevelFormula,
@@ -90,20 +114,71 @@ export const main = createLayer("main", function (this: BaseLayer) {
 
     const resourceMinedCooldown: Partial<Record<Resources, number>> = reactive({});
 
+    nextTick(() => {
+        resourceNames.forEach(resource => {
+            watch(
+                () => resourceLevels.value[resource],
+                (level, prevLevel) => {
+                    if (Decimal.gt(level, prevLevel) && settings.active === player.id) {
+                        toast.info(
+                            <div>
+                                <h3>
+                                    {Decimal.eq(level, 1)
+                                        ? `${camelToTitle(resource)} discovered`
+                                        : `${camelToTitle(resource)} is now Level ${formatWhole(
+                                              level
+                                          )}`}
+                                    !
+                                </h3>
+                                <div>Energy gain is now 1.01x higher.</div>
+                            </div>
+                        );
+                    }
+                }
+            );
+        });
+    });
+
     const board = createBoard(board => ({
-        startNodes: () => [{ position: { x: 0, y: 0 }, type: "mine", state: 0 }],
+        startNodes: () => [
+            { position: { x: 0, y: 0 }, type: "mine", state: 0 },
+            { position: { x: 400, y: -400 }, type: "brokenFactory" }
+        ],
         types: {
             mine: {
                 shape: Shape.Diamond,
                 size: 50,
-                title: "Mine",
-                label: node => (node === board.selectedNode.value ? null : { text: "Click me!" }),
+                title: "🪨",
+                label: node =>
+                    node === board.selectedNode.value
+                        ? { text: "Mining..." }
+                        : Object.keys(resourceNodes.value).length === 0
+                        ? { text: "Click me!" }
+                        : null,
                 progress: node =>
                     node == board.selectedNode.value
                         ? new Decimal(node.state as DecimalSource).toNumber()
                         : 0,
                 progressDisplay: ProgressDisplay.Outline,
-                progressColor: "var(--accent2)"
+                progressColor: "var(--accent2)",
+                draggable: true
+            },
+            brokenFactory: {
+                shape: Shape.Diamond,
+                size: 50,
+                title: "🛠️",
+                label: node => (node === board.selectedNode.value ? { text: "Repair me!" } : null),
+                actionDistance: 80,
+                actions: [
+                    { id: "repair", icon: "build", tooltip: "Costs 1000 energy", onClick() {} }
+                ],
+                draggable: true
+            },
+            factory: {
+                shape: Shape.Diamond,
+                size: 50,
+                title: "🛠️",
+                draggable: true
             },
             resource: {
                 shape: Shape.Circle,
@@ -111,7 +186,10 @@ export const main = createLayer("main", function (this: BaseLayer) {
                 title: node => (node.state as unknown as ResourceState).type,
                 subtitle: node => formatWhole((node.state as unknown as ResourceState).amount),
                 progress: node =>
-                    getResourceLevelProgress((node.state as unknown as ResourceState).amount),
+                    getResourceLevelProgress((node.state as unknown as ResourceState).type),
+                // Make clicking resources a no-op so they can't be selected
+                // eslint-disable-next-line @typescript-eslint/no-empty-function
+                onClick() {},
                 progressDisplay: ProgressDisplay.Outline,
                 progressColor: "var(--accent3)",
                 draggable: true
@@ -135,15 +213,6 @@ export const main = createLayer("main", function (this: BaseLayer) {
             }));
         }
     }));
-
-    const resourceNodes: ComputedRef<Record<Resources, BoardNode>> = computed(() =>
-        board.nodes.value.reduce((acc, curr) => {
-            if (curr.type === "resource") {
-                acc[(curr.state as unknown as ResourceState).type] = curr;
-            }
-            return acc;
-        }, {} as Record<Resources, BoardNode>)
-    );
 
     function grantResource(type: Resources, amount: DecimalSource) {
         let node = resourceNodes.value[type];
@@ -175,15 +244,11 @@ export const main = createLayer("main", function (this: BaseLayer) {
     const energyModifier = createSequentialModifier(() =>
         resourceNames.map(resource =>
             createMultiplicativeModifier(() => ({
-                description: resource,
-                multiplier: () =>
-                    Decimal.pow(
-                        1.01,
-                        resourceLevelFormula.invertIntegral(
-                            (resourceNodes.value[resource]?.state as ResourceState | undefined)
-                                ?.amount ?? 0
-                        )
-                    ),
+                description: () =>
+                    `${camelToTitle(resource)} (Lv. ${formatWhole(
+                        resourceLevels.value[resource]
+                    )})`,
+                multiplier: () => Decimal.pow(1.01, resourceLevels.value[resource]),
                 enabled: () =>
                     resource in resourceNodes.value &&
                     Decimal.gt(
@@ -195,14 +260,36 @@ export const main = createLayer("main", function (this: BaseLayer) {
         )
     );
     const computedEnergyModifier = computed(() => energyModifier.apply(1));
-    const energyGainTooltip = jsx(() =>
-        createModifierSection({
+
+    const [energyTab, energyTabCollapsed] = createCollapsibleModifierSections(() => [
+        {
             title: "Energy Gain",
             modifier: energyModifier,
             base: 1,
             unit: "/s"
+        }
+    ]);
+    const modifierTabs = createTabFamily({
+        general: () => ({
+            display: "Energy",
+            glowColor(): string {
+                return modifierTabs.activeTab.value === this.tab ? "white" : "";
+            },
+            tab: energyTab,
+            energyTabCollapsed
         })
-    );
+    });
+    const showModifiersModal = ref(false);
+    const modifiersModal = jsx(() => (
+        <Modal
+            modelValue={showModifiersModal.value}
+            onUpdate:modelValue={(value: boolean) => (showModifiersModal.value = value)}
+            v-slots={{
+                header: () => <h2>Modifiers</h2>,
+                body: () => render(modifierTabs)
+            }}
+        />
+    ));
 
     this.on("preUpdate", diff => {
         Object.keys(resourceMinedCooldown).forEach(resource => {
@@ -255,32 +342,40 @@ export const main = createLayer("main", function (this: BaseLayer) {
         name: "World",
         board,
         energy,
+        modifierTabs,
         display: jsx(() => (
             <>
-                {player.devSpeed === 0 ? <div>Game Paused</div> : null}
-                {player.devSpeed != null && player.devSpeed !== 0 && player.devSpeed !== 1 ? (
-                    <div>Dev Speed: {format(player.devSpeed)}x</div>
-                ) : null}
-                {player.offlineTime != null && player.offlineTime !== 0 ? (
-                    <div>Offline Time: {formatTime(player.offlineTime)}</div>
-                ) : null}
-                <MainDisplay resource={energy} />
-                <StickyVue style="margin-top: -20px">
-                    You are gaining{" "}
-                    <span class="tooltip-inline-container">
-                        <TooltipVue
-                            display={energyGainTooltip}
-                            direction={Direction.Down}
-                            style="width: 200px; text-align: left"
+                <StickyVue class="nav-container">
+                    <span class="nav-segment">
+                        <h2 style="color: white; text-shadow: 0px 0px 10px white;">
+                            {displayResource(energy)}
+                        </h2>{" "}
+                        energy
+                    </span>
+                    <span class="nav-segment">
+                        (
+                        <h3 style="color: white; text-shadow: 0px 0px 10px white;">
+                            +{format(computedEnergyModifier.value)}
+                        </h3>
+                        /s)
+                    </span>
+                    <span class="nav-segment">
+                        <button
+                            class="button"
+                            style="display: inline"
+                            onClick={() => (showModifiersModal.value = true)}
                         >
-                            <h3 style="color: white; text-shadow: 0px 0px 10px white;">
-                                {displayResource(energy, computedEnergyModifier.value)}
-                            </h3>
-                        </TooltipVue>
-                    </span>{" "}
-                    energy/sec{" "}
+                            open modifiers
+                        </button>
+                    </span>
+                    {player.devSpeed === 0 ? (
+                        <span class="nav-segment">Game Paused</span>
+                    ) : player.devSpeed != null && player.devSpeed !== 1 ? (
+                        <span class="nav-segment">Dev Speed: {format(player.devSpeed)}x</span>
+                    ) : null}
                 </StickyVue>
                 {render(board)}
+                {render(modifiersModal)}
             </>
         ))
     };

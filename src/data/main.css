@@ -1,4 +1,15 @@
-.tooltip-inline-container,
-.tooltip-inline-container > .tooltip-container {
-    display: inline;
+.nav-container {
+    margin-top: -50px;
+    text-align: left;
+    border-bottom: solid 1px var(--outline);
+    margin-left: -10px;
+    margin-right: -10px;
+    padding: 10px;
+    width: 100%;
+}
+
+.nav-segment {
+    border-right: solid 1px var(--outline);
+    padding-right: 10px; 
+    margin-right: 10px;
 }
