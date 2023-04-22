@@ -1,7 +1,10 @@
 import Modal from "components/Modal.vue";
 import StickyVue from "components/layout/Sticky.vue";
 import {
+    BoardData,
     BoardNode,
+    GenericBoard,
+    GenericBoardNodeAction,
     ProgressDisplay,
     Shape,
     createBoard,
@@ -14,9 +17,11 @@ import Formula, { calculateCost } from "game/formulas/formulas";
 import type { BaseLayer, GenericLayer } from "game/layers";
 import { createLayer } from "game/layers";
 import { createMultiplicativeModifier, createSequentialModifier } from "game/modifiers";
+import { Persistent, persistent } from "game/persistence";
 import { State } from "game/persistence";
 import type { Player } from "game/player";
 import player from "game/player";
+import settings from "game/settings";
 import Decimal, { DecimalSource } from "lib/break_eternity";
 import { format, formatWhole } from "util/bignum";
 import { camelToTitle } from "util/common";
@@ -25,7 +30,6 @@ import { ComputedRef, computed, nextTick, reactive, ref, watch } from "vue";
 import { useToast } from "vue-toastification";
 import { createCollapsibleModifierSections } from "./common";
 import "./main.css";
-import settings from "game/settings";
 
 const toast = useToast();
 
@@ -60,6 +64,7 @@ export type Resources = keyof typeof mineLootTable;
  */
 export const main = createLayer("main", function (this: BaseLayer) {
     const energy = createResource<DecimalSource>(0, "energy");
+    const hasForged = persistent<boolean>(false);
 
     const resourceLevelFormula = Formula.variable(0).add(1);
 
@@ -142,7 +147,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
     const board = createBoard(board => ({
         startNodes: () => [
             { position: { x: 0, y: 0 }, type: "mine", state: 0 },
-            { position: { x: 400, y: -400 }, type: "brokenFactory" }
+            { position: { x: 0, y: -200 }, type: "brokenFactory" }
         ],
         types: {
             mine: {
@@ -167,10 +172,30 @@ export const main = createLayer("main", function (this: BaseLayer) {
                 shape: Shape.Diamond,
                 size: 50,
                 title: "🛠️",
-                label: node => (node === board.selectedNode.value ? { text: "Repair me!" } : null),
+                label: node =>
+                    node === board.selectedNode.value ? { text: "Broken Forge" } : null,
                 actionDistance: 80,
                 actions: [
-                    { id: "repair", icon: "build", tooltip: "Costs 1000 energy", onClick() {} }
+                    {
+                        id: "repair",
+                        icon: "build",
+                        tooltip: { text: "Repair - 1000 energy" },
+                        onClick(this: GenericBoardNodeAction, node) {
+                            if (board.selectedAction.value === this) {
+                                if (Decimal.gte(energy.value, 1000)) {
+                                    node.type = "factory";
+                                    energy.value = Decimal.sub(energy.value, 1000);
+                                }
+                            } else {
+                                ((board as GenericBoard).state as Persistent<BoardData>).value = {
+                                    ...((board as GenericBoard).state as Persistent<BoardData>)
+                                        .value,
+                                    selectedAction: this.id
+                                };
+                            }
+                            return true;
+                        }
+                    }
                 ],
                 draggable: true
             },
@@ -178,6 +203,10 @@ export const main = createLayer("main", function (this: BaseLayer) {
                 shape: Shape.Diamond,
                 size: 50,
                 title: "🛠️",
+                label: node =>
+                    node === board.selectedNode.value
+                        ? { text: hasForged.value ? "Forge" : "Forge - Drag a material to me!" }
+                        : null,
                 draggable: true
             },
             resource: {
@@ -343,6 +372,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
         board,
         energy,
         modifierTabs,
+        hasForged,
         display: jsx(() => (
             <>
                 <StickyVue class="nav-container">
