@@ -141,6 +141,97 @@ export const main = createLayer("main", function (this: BaseLayer) {
         });
     });
 
+    const tools = {
+        dirt: {
+            cost: 1000,
+            name: "Unknown Item",
+            type: "unknownType"
+        },
+        sand: {
+            cost: 1e4,
+            name: "Unknown Item",
+            type: "unknownType"
+        },
+        gravel: {
+            cost: 1e5,
+            name: "Unknown Item",
+            type: "unknownType"
+        },
+        wood: {
+            cost: 1e6,
+            name: "Unknown Item",
+            type: "unknownType"
+        },
+        stone: {
+            cost: 1e7,
+            name: "Unknown Item",
+            type: "unknownType"
+        },
+        coal: {
+            cost: 1e8,
+            name: "Unknown Item",
+            type: "unknownType"
+        },
+        copper: {
+            cost: 1e9,
+            name: "Unknown Item",
+            type: "unknownType"
+        },
+        iron: {
+            cost: 1e10,
+            name: "Portal Generator",
+            type: "portalGenerator"
+        },
+        silver: {
+            cost: 1e12,
+            name: "Unknown Item",
+            type: "unknownType"
+        },
+        gold: {
+            cost: 1e15,
+            name: "Unknown Item",
+            type: "unknownType"
+        },
+        emerald: {
+            cost: 1e19,
+            name: "Unknown Item",
+            type: "unknownType"
+        },
+        platinum: {
+            cost: 1e24,
+            name: "Unknown Item",
+            type: "unknownType"
+        },
+        diamond: {
+            cost: 1e30,
+            name: "Unknown Item",
+            type: "unknownType"
+        },
+        berylium: {
+            cost: 1e37,
+            name: "Unknown Item",
+            type: "unknownType"
+        },
+        unobtainium: {
+            cost: 1e45,
+            name: "Unknown Item",
+            type: "unknownType"
+        },
+        ultimatum: {
+            cost: 1e54,
+            name: "Unknown Item",
+            type: "unknownType"
+        }
+    } satisfies Record<
+        Resources,
+        {
+            cost: DecimalSource;
+            name: string;
+            type: string;
+            state?: State;
+        }
+    >;
+
     const board = createBoard(board => ({
         startNodes: () => [
             { position: { x: 0, y: 0 }, type: "mine", state: 0 },
@@ -198,25 +289,48 @@ export const main = createLayer("main", function (this: BaseLayer) {
                 title: "🛠️",
                 label: node =>
                     node === board.selectedNode.value
-                        ? { text: hasForged.value ? "Forge" : "Forge - Drag a material to me!" }
+                        ? {
+                              text:
+                                  node.state == null
+                                      ? hasForged.value
+                                          ? "Forge"
+                                          : "Forge - Drag a material to me!"
+                                      : `Forge - ${tools[node.state as Resources].name} selected`
+                          }
                         : null,
                 actionDistance: 100,
                 actions: [
                     {
+                        id: "craft",
+                        icon: "done",
+                        tooltip: node => ({
+                            text: `Forge ${tools[node.state as Resources].name} - ${formatWhole(
+                                tools[node.state as Resources].cost
+                            )} energy`
+                        }),
+                        onClick(node) {
+                            const cost = tools[node.state as Resources].cost;
+                            if (Decimal.gte(energy.value, cost)) {
+                                energy.value = Decimal.sub(energy.value, cost);
+                                // TODO create tool
+                                board.selectedAction.value = null;
+                                board.selectedNode.value = null;
+                            }
+                        },
+                        visibility: node => node.state != null,
+                        confirmationLabel: node =>
+                            Decimal.gte(energy.value, tools[node.state as Resources].cost)
+                                ? { text: "Tap again to confirm" }
+                                : { text: "Cannot afford", color: "var(--danger)" }
+                    },
+                    {
                         id: "deselect",
-                        icon: "",
+                        icon: "close",
                         tooltip: { text: "De-select material" },
                         onClick(node) {
                             node.state = undefined;
-                        },
-                        visibility: node => node.state != null
-                    },
-                    {
-                        id: "craft",
-                        icon: "",
-                        tooltip: node => ({ text: "Craft unknown item" }),
-                        onClick(node) {
-                            // TODO create tool
+                            board.selectedAction.value = null;
+                            board.selectedNode.value = null;
                         },
                         visibility: node => node.state != null
                     }
@@ -395,6 +509,11 @@ export const main = createLayer("main", function (this: BaseLayer) {
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         if (board.selectedAction.value === board.types.brokenFactory.actions![0]) {
             return -1000;
+        }
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        if (board.selectedAction.value === board.types.factory.actions![0]) {
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+            return Decimal.neg(tools[board.selectedNode.value!.state as Resources].cost);
         }
         return 0;
     });
