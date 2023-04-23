@@ -11,14 +11,13 @@ import {
     getUniqueNodeID
 } from "features/boards/board";
 import { jsx } from "features/feature";
-import { createResource, displayResource } from "features/resources/resource";
+import { createResource } from "features/resources/resource";
 import { createTabFamily } from "features/tabs/tabFamily";
 import Formula, { calculateCost } from "game/formulas/formulas";
 import type { BaseLayer, GenericLayer } from "game/layers";
 import { createLayer } from "game/layers";
 import { createMultiplicativeModifier, createSequentialModifier } from "game/modifiers";
-import { Persistent, persistent } from "game/persistence";
-import { State } from "game/persistence";
+import { Persistent, State, persistent } from "game/persistence";
 import type { Player } from "game/player";
 import player from "game/player";
 import settings from "game/settings";
@@ -28,7 +27,7 @@ import { camelToTitle } from "util/common";
 import { render } from "util/vue";
 import { ComputedRef, computed, nextTick, reactive, ref, watch } from "vue";
 import { useToast } from "vue-toastification";
-import { createCollapsibleModifierSections } from "./common";
+import { createCollapsibleModifierSections, createFormulaPreview } from "./common";
 import "./main.css";
 
 const toast = useToast();
@@ -368,6 +367,26 @@ export const main = createLayer("main", function (this: BaseLayer) {
         energy.value = Decimal.add(energy.value, Decimal.times(computedEnergyModifier.value, diff));
     });
 
+    const energyChange = computed(() => {
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        if (board.selectedAction.value === board.types.brokenFactory.actions![0]) {
+            return -1000;
+        }
+        return 0;
+    });
+    const energyPreview = createFormulaPreview(
+        Formula.variable(0).add(energy),
+        () => Decimal.neq(energyChange.value, 0),
+        energyChange
+    );
+
+    const energyProductionChange = computed(() => 0);
+    const energyProductionPreview = createFormulaPreview(
+        Formula.variable(0).add(computedEnergyModifier),
+        () => Decimal.neq(energyProductionChange.value, 0),
+        energyProductionChange
+    );
+
     return {
         name: "World",
         board,
@@ -379,14 +398,15 @@ export const main = createLayer("main", function (this: BaseLayer) {
                 <StickyVue class="nav-container">
                     <span class="nav-segment">
                         <h2 style="color: white; text-shadow: 0px 0px 10px white;">
-                            {displayResource(energy)}
+                            {render(energyPreview)}
                         </h2>{" "}
                         energy
                     </span>
                     <span class="nav-segment">
                         (
                         <h3 style="color: white; text-shadow: 0px 0px 10px white;">
-                            +{format(computedEnergyModifier.value)}
+                            {Decimal.gt(computedEnergyModifier.value, 0) ? "+" : ""}
+                            {render(energyProductionPreview)}
                         </h3>
                         /s)
                     </span>
