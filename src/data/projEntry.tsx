@@ -2,6 +2,7 @@ import Modal from "components/Modal.vue";
 import StickyVue from "components/layout/Sticky.vue";
 import {
     BoardNode,
+    GenericBoard,
     ProgressDisplay,
     Shape,
     createBoard,
@@ -220,6 +221,13 @@ export const main = createLayer("main", function (this: BaseLayer) {
                         visibility: node => node.state != null
                     }
                 ],
+                canAccept(node, otherNode) {
+                    return otherNode.type === "resource";
+                },
+                onDrop(node, otherNode) {
+                    node.state = (otherNode.state as unknown as ResourceState).type;
+                    board.selectedNode.value = node;
+                },
                 draggable: true
             },
             resource: {
