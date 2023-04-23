@@ -938,6 +938,14 @@ export const main = createLayer("main", function (this: BaseLayer) {
                         </h3>
                         /s)
                     </span>
+                    {Decimal.gt(poweredMachines.value, 0) ? (
+                        <span class="nav-segment">
+                            <h3 style="color: var(--accent1); text-shadow: 0px 0px 10px var(--accent1);">
+                                {formatWhole(poweredMachines.value)}
+                            </h3>{" "}
+                            machines powered
+                        </span>
+                    ) : null}
                     <span class="nav-segment">
                         <button
                             class="button"
