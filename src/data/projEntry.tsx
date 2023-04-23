@@ -34,6 +34,11 @@ import "./main.css";
 
 const toast = useToast();
 
+export interface MineState {
+    progress: DecimalSource;
+    powered: boolean;
+}
+
 export interface ResourceState {
     type: Resources;
     amount: DecimalSource;
@@ -263,9 +268,41 @@ export const main = createLayer("main", function (this: BaseLayer) {
         });
     });
 
+    const poweredMachines = computed(() => {
+        let poweredMachines = 0;
+        if ((mine.value.state as unknown as MineState).powered) {
+            poweredMachines++;
+        }
+        return poweredMachines;
+    });
+    const nextPowerCost = computed(() =>
+        Decimal.eq(poweredMachines.value, 0)
+            ? 10
+            : Decimal.add(poweredMachines.value, 1).pow10().times(0.9)
+    );
+
+    const togglePoweredAction = {
+        id: "toggle",
+        icon: "bolt",
+        tooltip: (node: BoardNode) => ({
+            text: (node.state as { powered: boolean }).powered
+                ? "Turn Off"
+                : `Turn On - Always runs for ${formatWhole(nextPowerCost.value)} energy/s`
+        }),
+        onClick(node: BoardNode) {
+            node.state = {
+                ...(node.state as object),
+                powered: !(node.state as { powered: boolean }).powered
+            };
+            board.selectedAction.value = null;
+        },
+        fillColor: (node: BoardNode) =>
+            (node.state as { powered: boolean }).powered ? "var(--accent1)" : "var(--locked)"
+    };
+
     const board = createBoard(board => ({
         startNodes: () => [
-            { position: { x: 0, y: 0 }, type: "mine", state: 0 },
+            { position: { x: 0, y: 0 }, type: "mine", state: { progress: 0, powered: false } },
             { position: { x: 0, y: -200 }, type: "brokenFactory" }
         ],
         types: {
@@ -279,13 +316,17 @@ export const main = createLayer("main", function (this: BaseLayer) {
                         : Object.keys(resourceNodes.value).length === 0
                         ? { text: "Click me!" }
                         : null,
+                actionDistance: 100,
+                actions: [togglePoweredAction],
                 progress: node =>
-                    node == board.selectedNode.value
-                        ? new Decimal(node.state as DecimalSource).toNumber()
+                    isPowered(node)
+                        ? new Decimal((node.state as unknown as MineState).progress).toNumber()
                         : 0,
                 progressDisplay: ProgressDisplay.Outline,
                 progressColor: "var(--accent2)",
-                classes: node => ({ running: node === board.selectedNode.value }),
+                classes: node => ({
+                    running: isPowered(node)
+                }),
                 draggable: true
             },
             brokenFactory: {
@@ -383,6 +424,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
                                 board.nodes.value.push(newNode);
                                 board.selectedAction.value = null;
                                 board.selectedNode.value = null;
+                                node.state = undefined;
                             }
                         },
                         fillColor: node =>
@@ -448,6 +490,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
                               text: passives[node.state as Passives].description
                           }
                         : null,
+                outlineColor: "var(--bought)",
                 draggable: true
             }
         },
@@ -460,18 +503,16 @@ export const main = createLayer("main", function (this: BaseLayer) {
             overflow: "hidden"
         },
         links() {
-            const mine = board.nodes.value.find(n => n.type === "mine") as BoardNode;
             const links = Object.keys(resourceMinedCooldown).map(resource => ({
-                startNode: mine,
+                startNode: mine.value,
                 endNode: resourceNodes.value[resource as Resources],
                 stroke: "var(--accent3)",
                 strokeWidth: 5
             }));
-            const factory = board.nodes.value.find(n => n.type === "factory");
-            if (factory != null && factory.state != null) {
+            if (factory.value != null && factory.value.state != null) {
                 links.push({
-                    startNode: factory,
-                    endNode: resourceNodes.value[factory.state as Resources],
+                    startNode: factory.value,
+                    endNode: resourceNodes.value[factory.value.state as Resources],
                     stroke: "var(--foreground)",
                     strokeWidth: 4
                 });
@@ -480,13 +521,21 @@ export const main = createLayer("main", function (this: BaseLayer) {
         }
     }));
 
+    function isPowered(node: BoardNode): boolean {
+        return node === board.selectedNode.value || (node.state as { powered: boolean }).powered;
+    }
+
+    const mine: ComputedRef<BoardNode> = computed(
+        () => board.nodes.value.find(n => n.type === "mine") as BoardNode
+    );
+    const factory = computed(() => board.nodes.value.find(n => n.type === "factory"));
+
     function grantResource(type: Resources, amount: DecimalSource) {
         let node = resourceNodes.value[type];
         if (node == null) {
-            const mine = board.nodes.value.find(n => n.type === "mine") as BoardNode;
             node = {
                 id: getUniqueNodeID(board),
-                position: { ...mine.position },
+                position: { ...mine.value.position },
                 type: "resource",
                 state: { type, amount }
             };
@@ -530,6 +579,11 @@ export const main = createLayer("main", function (this: BaseLayer) {
             multiplier: 2,
             description: tools.stone.name,
             enabled: () => "stone" in toolNodes.value
+        })),
+        createAdditiveModifier(() => ({
+            addend: () => Decimal.pow10(poweredMachines.value).neg(),
+            description: "Powered Machines (10^n energy/s)",
+            enabled: () => Decimal.gt(poweredMachines.value, 0)
         }))
     ]);
     const computedEnergyModifier = computed(() => energyModifier.apply(1));
@@ -633,14 +687,16 @@ export const main = createLayer("main", function (this: BaseLayer) {
             }
         });
 
-        if (board.selectedNode.value?.type === "mine") {
-            const mine = board.selectedNode.value;
+        if (isPowered(mine.value)) {
             const progress = Decimal.add(
-                mine.state as DecimalSource,
+                (mine.value.state as unknown as MineState).progress,
                 Decimal.times(computedMiningSpeedModifier.value, diff)
             );
             const completions = progress.floor();
-            mine.state = Decimal.sub(progress, completions);
+            mine.value.state = {
+                ...(mine.value.state as object),
+                progress: Decimal.sub(progress, completions)
+            };
             const allResourceCompletions = completions.div(sumMineWeights).floor();
             if (allResourceCompletions.gt(0)) {
                 resourceNames.forEach(resource => {
@@ -691,7 +747,16 @@ export const main = createLayer("main", function (this: BaseLayer) {
         energyChange
     );
 
-    const energyProductionChange = computed(() => 0);
+    const energyProductionChange = computed(() => {
+        if (board.selectedAction.value === togglePoweredAction) {
+            return (board.selectedNode.value?.state as { powered: boolean }).powered
+                ? Decimal.eq(poweredMachines.value, 1)
+                    ? 10
+                    : Decimal.pow10(poweredMachines.value).times(0.9)
+                : Decimal.neg(nextPowerCost.value);
+        }
+        return 0;
+    });
     const energyProductionPreview = createFormulaPreview(
         Formula.variable(0).add(computedEnergyModifier),
         () => Decimal.neq(energyProductionChange.value, 0),
