@@ -328,6 +328,33 @@ export const main = createLayer("main", function (this: BaseLayer) {
                                           : "Forge - Drag a material to me!"
                                       : `Forge - ${tools[node.state as Resources].name} selected`
                           }
+                        : (board as GenericBoard).draggingNode.value?.type === "resource"
+                        ? {
+                              text: tools[
+                                  (
+                                      (board as GenericBoard).draggingNode.value
+                                          ?.state as unknown as ResourceState
+                                  ).type
+                              ].name,
+                              color:
+                                  Decimal.gte(
+                                      energy.value,
+                                      tools[
+                                          (
+                                              (board as GenericBoard).draggingNode.value
+                                                  ?.state as unknown as ResourceState
+                                          ).type
+                                      ].cost
+                                  ) &&
+                                  !(
+                                      (
+                                          (board as GenericBoard).draggingNode.value
+                                              ?.state as unknown as ResourceState
+                                      ).type in toolNodes.value
+                                  )
+                                      ? "var(--accent2)"
+                                      : "var(--danger)"
+                          }
                         : null,
                 actionDistance: 100,
                 actions: [
