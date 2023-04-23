@@ -1,10 +1,7 @@
 import Modal from "components/Modal.vue";
 import StickyVue from "components/layout/Sticky.vue";
 import {
-    BoardData,
     BoardNode,
-    GenericBoard,
-    GenericBoardNodeAction,
     ProgressDisplay,
     Shape,
     createBoard,
@@ -17,7 +14,7 @@ import Formula, { calculateCost } from "game/formulas/formulas";
 import type { BaseLayer, GenericLayer } from "game/layers";
 import { createLayer } from "game/layers";
 import { createMultiplicativeModifier, createSequentialModifier } from "game/modifiers";
-import { Persistent, State, persistent } from "game/persistence";
+import { State, persistent } from "game/persistence";
 import type { Player } from "game/player";
 import player from "game/player";
 import settings from "game/settings";
@@ -180,21 +177,16 @@ export const main = createLayer("main", function (this: BaseLayer) {
                         id: "repair",
                         icon: "build",
                         tooltip: { text: "Repair - 1000 energy" },
-                        onClick(this: GenericBoardNodeAction, node) {
-                            if (board.selectedAction.value === this) {
-                                if (Decimal.gte(energy.value, 1000)) {
-                                    node.type = "factory";
-                                    energy.value = Decimal.sub(energy.value, 1000);
-                                }
-                            } else {
-                                ((board as GenericBoard).state as Persistent<BoardData>).value = {
-                                    ...((board as GenericBoard).state as Persistent<BoardData>)
-                                        .value,
-                                    selectedAction: this.id
-                                };
+                        onClick(node) {
+                            if (Decimal.gte(energy.value, 1000)) {
+                                node.type = "factory";
+                                energy.value = Decimal.sub(energy.value, 1000);
                             }
-                            return true;
-                        }
+                        },
+                        confirmationLabel: () =>
+                            Decimal.gte(energy.value, 1000)
+                                ? { text: "Tap again to confirm" }
+                                : { text: "Cannot afford", color: "var(--danger)" }
                     }
                 ],
                 draggable: true
@@ -214,16 +206,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
                         icon: "",
                         tooltip: { text: "De-select material" },
                         onClick(node) {
-                            if (board.selectedAction.value === this) {
-                                node.state = undefined;
-                            } else {
-                                ((board as GenericBoard).state as Persistent<BoardData>).value = {
-                                    ...((board as GenericBoard).state as Persistent<BoardData>)
-                                        .value,
-                                    selectedAction: this.id
-                                };
-                            }
-                            return true;
+                            node.state = undefined;
                         },
                         visibility: node => node.state != null
                     },
@@ -232,16 +215,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
                         icon: "",
                         tooltip: node => ({ text: "Craft unknown item" }),
                         onClick(node) {
-                            if (board.selectedAction.value === this) {
-                                // TODO create tool
-                            } else {
-                                ((board as GenericBoard).state as Persistent<BoardData>).value = {
-                                    ...((board as GenericBoard).state as Persistent<BoardData>)
-                                        .value,
-                                    selectedAction: this.id
-                                };
-                            }
-                            return true;
+                            // TODO create tool
                         },
                         visibility: node => node.state != null
                     }
