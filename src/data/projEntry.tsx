@@ -166,6 +166,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
                         : 0,
                 progressDisplay: ProgressDisplay.Outline,
                 progressColor: "var(--accent2)",
+                classes: node => ({ running: node === board.selectedNode.value }),
                 draggable: true
             },
             brokenFactory: {

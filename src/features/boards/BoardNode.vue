@@ -275,7 +275,7 @@ function mouseUp(e: MouseEvent | TouchEvent) {
     fill: var(--highlighted);
 }
 
-.boardnode.isSelected .body {
+.boardnode.running .body {
     fill: var(--accent1) !important;
 }
 
