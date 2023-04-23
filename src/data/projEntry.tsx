@@ -8,7 +8,7 @@ import {
     createBoard,
     getUniqueNodeID
 } from "features/boards/board";
-import { JSXFunction, jsx } from "features/feature";
+import { jsx } from "features/feature";
 import { createResource } from "features/resources/resource";
 import { createTabFamily } from "features/tabs/tabFamily";
 import Formula, { calculateCost } from "game/formulas/formulas";
@@ -20,7 +20,7 @@ import {
     createMultiplicativeModifier,
     createSequentialModifier
 } from "game/modifiers";
-import { Persistent, State, persistent } from "game/persistence";
+import { State, persistent } from "game/persistence";
 import type { Player } from "game/player";
 import player from "game/player";
 import settings from "game/settings";
@@ -476,6 +476,14 @@ export const main = createLayer("main", function (this: BaseLayer) {
                 onClick() {},
                 progressDisplay: ProgressDisplay.Outline,
                 progressColor: "var(--accent3)",
+                classes: node => ({
+                    "affected-node":
+                        dowsing.value != null &&
+                        isPowered(dowsing.value) &&
+                        (dowsing.value.state as unknown as DowsingState).resources.includes(
+                            (node.state as unknown as ResourceState).type
+                        )
+                }),
                 draggable: true
             },
             passive: {
@@ -609,6 +617,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
                         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                         startNode: dowsing.value!,
                         endNode: resourceNodes.value[resource],
+                        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                         stroke: isPowered(dowsing.value!) ? "var(--accent1)" : "var(--foreground)",
                         strokeWidth: 4
                     });
@@ -625,8 +634,12 @@ export const main = createLayer("main", function (this: BaseLayer) {
     const mine: ComputedRef<BoardNode> = computed(
         () => board.nodes.value.find(n => n.type === "mine") as BoardNode
     );
-    const factory = computed(() => board.nodes.value.find(n => n.type === "factory"));
-    const dowsing = computed(() => board.nodes.value.find(n => n.type === "dowsing"));
+    const factory: ComputedRef<BoardNode | undefined> = computed(() =>
+        board.nodes.value.find(n => n.type === "factory")
+    );
+    const dowsing: ComputedRef<BoardNode | undefined> = computed(() =>
+        board.nodes.value.find(n => n.type === "dowsing")
+    );
 
     function grantResource(type: Resources, amount: DecimalSource) {
         let node = resourceNodes.value[type];
