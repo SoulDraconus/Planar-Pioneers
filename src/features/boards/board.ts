@@ -261,6 +261,10 @@ export interface BaseBoard {
     selectedNode: Ref<BoardNode | null>;
     /** The currently selected action, if any. */
     selectedAction: Ref<GenericBoardNodeAction | null>;
+    /** The currently being dragged node, if any. */
+    draggingNode: Ref<BoardNode | null>;
+    /** If dragging a node, the node it's currently being hovered over, if any. */
+    receivingNode: Ref<BoardNode | null>;
     /** The current mouse position, if over the board. */
     mousePosition: Ref<{ x: number; y: number } | null>;
     /** A symbol that helps identify features of the same type. */
@@ -375,6 +379,8 @@ export function createBoard<T extends BoardOptions>(
                 return null;
             });
         }
+        board.draggingNode = ref(null);
+        board.receivingNode = ref(null);
         processComputable(board as T, "visibility");
         setDefault(board, "visibility", Visibility.Visible);
         processComputable(board as T, "width");
@@ -431,6 +437,15 @@ export function createBoard<T extends BoardOptions>(
             }
         }
 
+        function setDraggingNode(node: BoardNode | null) {
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+            board.draggingNode!.value = node;
+        }
+        function setReceivingNode(node: BoardNode | null) {
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+            board.receivingNode!.value = node;
+        }
+
         board[GatherProps] = function (this: GenericBoard) {
             const {
                 nodes,
@@ -444,7 +459,9 @@ export function createBoard<T extends BoardOptions>(
                 links,
                 selectedAction,
                 selectedNode,
-                mousePosition
+                mousePosition,
+                draggingNode,
+                receivingNode
             } = this;
             return {
                 nodes,
@@ -458,7 +475,11 @@ export function createBoard<T extends BoardOptions>(
                 links,
                 selectedAction,
                 selectedNode,
-                mousePosition
+                mousePosition,
+                draggingNode,
+                receivingNode,
+                setDraggingNode,
+                setReceivingNode
             };
         };
 
