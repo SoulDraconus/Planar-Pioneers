@@ -8,28 +8,29 @@ import {
     createBoard,
     getUniqueNodeID
 } from "features/boards/board";
-import { jsx } from "features/feature";
+import { JSXFunction, jsx } from "features/feature";
 import { createResource } from "features/resources/resource";
 import { createTabFamily } from "features/tabs/tabFamily";
 import Formula, { calculateCost } from "game/formulas/formulas";
 import type { BaseLayer, GenericLayer } from "game/layers";
 import { createLayer } from "game/layers";
 import {
+    Modifier,
     createAdditiveModifier,
     createMultiplicativeModifier,
     createSequentialModifier
 } from "game/modifiers";
-import { State, persistent } from "game/persistence";
+import { Persistent, State, persistent } from "game/persistence";
 import type { Player } from "game/player";
 import player from "game/player";
 import settings from "game/settings";
 import Decimal, { DecimalSource } from "lib/break_eternity";
 import { format, formatWhole } from "util/bignum";
-import { camelToTitle } from "util/common";
+import { WithRequired, camelToTitle } from "util/common";
 import { render } from "util/vue";
 import { ComputedRef, computed, nextTick, reactive, ref, watch } from "vue";
 import { useToast } from "vue-toastification";
-import { createCollapsibleModifierSections, createFormulaPreview } from "./common";
+import { Section, createCollapsibleModifierSections, createFormulaPreview } from "./common";
 import "./main.css";
 
 const toast = useToast();
@@ -42,6 +43,12 @@ export interface MineState {
 export interface ResourceState {
     type: Resources;
     amount: DecimalSource;
+}
+
+export interface DowsingState {
+    resources: Resources[];
+    maxConnections: number;
+    powered: boolean;
 }
 
 const mineLootTable = {
@@ -64,6 +71,7 @@ const mineLootTable = {
 } as const;
 
 export type Resources = keyof typeof mineLootTable;
+const resourceNames = Object.keys(mineLootTable) as Resources[];
 
 const tools = {
     dirt: {
@@ -75,7 +83,8 @@ const tools = {
     sand: {
         cost: 1e4,
         name: "Dowsing Rod",
-        type: "dowsing"
+        type: "dowsing",
+        state: { resources: [], maxConnections: 1, powered: false }
     },
     gravel: {
         cost: 1e5,
@@ -193,13 +202,13 @@ export const main = createLayer("main", function (this: BaseLayer) {
         }, {} as Record<Resources, BoardNode>)
     );
 
-    const toolNodes: ComputedRef<Record<Resources, BoardNode>> = computed(() =>
-        // TODO add non-passive tools
-        board.types.passive.nodes.value.reduce((acc, curr) => {
+    const toolNodes: ComputedRef<Record<Resources, BoardNode>> = computed(() => ({
+        ...board.types.passive.nodes.value.reduce((acc, curr) => {
             acc[curr.state as Resources] = curr;
             return acc;
-        }, {} as Record<Resources, BoardNode>)
-    );
+        }, {} as Record<Resources, BoardNode>),
+        sand: board.types.dowsing.nodes.value[0]
+    }));
 
     const resourceLevels = computed(() =>
         resourceNames.reduce((acc, curr) => {
@@ -268,17 +277,14 @@ export const main = createLayer("main", function (this: BaseLayer) {
         });
     });
 
-    const poweredMachines = computed(() => {
-        let poweredMachines = 0;
-        if ((mine.value.state as unknown as MineState).powered) {
-            poweredMachines++;
-        }
-        return poweredMachines;
+    const poweredMachines: ComputedRef<number> = computed(() => {
+        return [mine, dowsing].filter(node => (node.value?.state as { powered: boolean })?.powered)
+            .length;
     });
     const nextPowerCost = computed(() =>
         Decimal.eq(poweredMachines.value, 0)
             ? 10
-            : Decimal.add(poweredMachines.value, 1).pow10().times(0.9)
+            : Decimal.add(poweredMachines.value, 1).pow_base(100).div(10).times(0.99)
     );
 
     const togglePoweredAction = {
@@ -359,44 +365,36 @@ export const main = createLayer("main", function (this: BaseLayer) {
                 shape: Shape.Diamond,
                 size: 50,
                 title: "🛠️",
-                label: node =>
-                    node === board.selectedNode.value
-                        ? {
-                              text:
-                                  node.state == null
-                                      ? hasForged.value
-                                          ? "Forge"
-                                          : "Forge - Drag a material to me!"
-                                      : `Forge - ${tools[node.state as Resources].name} selected`
-                          }
-                        : (board as GenericBoard).draggingNode.value?.type === "resource"
-                        ? {
-                              text: tools[
-                                  (
-                                      (board as GenericBoard).draggingNode.value
-                                          ?.state as unknown as ResourceState
-                                  ).type
-                              ].name,
-                              color:
-                                  Decimal.gte(
-                                      energy.value,
-                                      tools[
-                                          (
-                                              (board as GenericBoard).draggingNode.value
-                                                  ?.state as unknown as ResourceState
-                                          ).type
-                                      ].cost
-                                  ) &&
-                                  !(
-                                      (
-                                          (board as GenericBoard).draggingNode.value
-                                              ?.state as unknown as ResourceState
-                                      ).type in toolNodes.value
-                                  )
-                                      ? "var(--accent2)"
-                                      : "var(--danger)"
-                          }
-                        : null,
+                label: node => {
+                    if (node === board.selectedNode.value) {
+                        return {
+                            text:
+                                node.state == null
+                                    ? hasForged.value
+                                        ? "Forge"
+                                        : "Forge - Drag a resource to me!"
+                                    : `Forge - ${tools[node.state as Resources].name} selected`
+                        };
+                    }
+                    if ((board as GenericBoard).draggingNode.value?.type === "resource") {
+                        const resource = (
+                            (board as GenericBoard).draggingNode.value
+                                ?.state as unknown as ResourceState
+                        ).type;
+                        const text = node.state === resource ? "Disconnect" : tools[resource].name;
+                        const color =
+                            node.state === resource ||
+                            (Decimal.gte(energy.value, tools[resource].cost) &&
+                                toolNodes.value[resource] == null)
+                                ? "var(--accent2)"
+                                : "var(--danger)";
+                        return {
+                            text,
+                            color
+                        };
+                    }
+                    return null;
+                },
                 actionDistance: 100,
                 actions: [
                     {
@@ -411,7 +409,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
                             const tool = tools[node.state as Resources];
                             if (
                                 Decimal.gte(energy.value, tool.cost) &&
-                                !((node.state as Resources) in toolNodes.value)
+                                toolNodes.value[node.state as Resources] == null
                             ) {
                                 energy.value = Decimal.sub(energy.value, tool.cost);
                                 const newNode = {
@@ -429,13 +427,13 @@ export const main = createLayer("main", function (this: BaseLayer) {
                         },
                         fillColor: node =>
                             Decimal.gte(energy.value, tools[node.state as Resources].cost) &&
-                            !((node.state as Resources) in toolNodes.value)
+                            toolNodes.value[node.state as Resources] == null
                                 ? "var(--accent2)"
                                 : "var(--danger)",
                         visibility: node => node.state != null,
                         confirmationLabel: node =>
                             Decimal.gte(energy.value, tools[node.state as Resources].cost)
-                                ? !((node.state as Resources) in toolNodes.value)
+                                ? toolNodes.value[node.state as Resources] == null
                                     ? { text: "Tap again to confirm" }
                                     : { text: "Already crafted", color: "var(--danger)" }
                                 : { text: "Cannot afford", color: "var(--danger)" }
@@ -443,7 +441,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
                     {
                         id: "deselect",
                         icon: "close",
-                        tooltip: { text: "De-select material" },
+                        tooltip: { text: "Disconnect resource" },
                         onClick(node) {
                             node.state = undefined;
                             board.selectedAction.value = null;
@@ -492,6 +490,94 @@ export const main = createLayer("main", function (this: BaseLayer) {
                         : null,
                 outlineColor: "var(--bought)",
                 draggable: true
+            },
+            dowsing: {
+                shape: Shape.Diamond,
+                size: 50,
+                title: "🥢",
+                label: node => {
+                    if (node === board.selectedNode.value) {
+                        return {
+                            text:
+                                (node.state as unknown as DowsingState).resources.length === 0
+                                    ? "Dowsing - Drag a resource to me!"
+                                    : `Dowsing - Doubling ${
+                                          (node.state as { resources: Resources[] }).resources
+                                              .length
+                                      } materials' odds`
+                        };
+                    }
+                    if ((board as GenericBoard).draggingNode.value?.type === "resource") {
+                        const resource = (
+                            (board as GenericBoard).draggingNode.value
+                                ?.state as unknown as ResourceState
+                        ).type;
+                        const { maxConnections, resources } = node.state as unknown as DowsingState;
+                        if (resources.includes(resource)) {
+                            return { text: "Disconnect", color: "var(--accent2)" };
+                        }
+                        if (resources.length === maxConnections) {
+                            return { text: "Max connections", color: "var(--danger)" };
+                        }
+                        return {
+                            text: `Double ${resource} odds`,
+                            color: "var(--accent2)"
+                        };
+                    }
+                    return null;
+                },
+                actions: [
+                    {
+                        id: "deselect",
+                        icon: "close",
+                        tooltip: { text: "Disconnect resources" },
+                        onClick(node) {
+                            node.state = { ...(node.state as object), resources: [] };
+                            board.selectedAction.value = null;
+                            board.selectedNode.value = null;
+                        },
+                        visibility: node =>
+                            (node.state as unknown as DowsingState).resources.length > 0
+                    },
+                    togglePoweredAction
+                ],
+                classes: node => ({
+                    running: isPowered(node)
+                }),
+                canAccept(node, otherNode) {
+                    if (otherNode.type !== "resource") {
+                        return false;
+                    }
+                    const resource = (otherNode.state as unknown as ResourceState).type;
+                    const { maxConnections, resources } = node.state as unknown as DowsingState;
+                    if (resources.includes(resource)) {
+                        return true;
+                    }
+                    if (resources.length === maxConnections) {
+                        return false;
+                    }
+                    return true;
+                },
+                onDrop(node, otherNode) {
+                    if (otherNode.type !== "resource") {
+                        return;
+                    }
+                    const resource = (otherNode.state as unknown as ResourceState).type;
+                    const resources = (node.state as unknown as DowsingState).resources;
+                    if (resources.includes(resource)) {
+                        node.state = {
+                            ...(node.state as object),
+                            resources: resources.filter(r => r !== resource)
+                        };
+                    } else {
+                        node.state = {
+                            ...(node.state as object),
+                            resources: [...resources, resource]
+                        };
+                    }
+                    board.selectedNode.value = node;
+                },
+                draggable: true
             }
         },
         style: {
@@ -517,6 +603,17 @@ export const main = createLayer("main", function (this: BaseLayer) {
                     strokeWidth: 4
                 });
             }
+            if (dowsing.value != null) {
+                (dowsing.value.state as unknown as DowsingState).resources.forEach(resource => {
+                    links.push({
+                        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                        startNode: dowsing.value!,
+                        endNode: resourceNodes.value[resource],
+                        stroke: isPowered(dowsing.value!) ? "var(--accent1)" : "var(--foreground)",
+                        strokeWidth: 4
+                    });
+                });
+            }
             return links;
         }
     }));
@@ -529,6 +626,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
         () => board.nodes.value.find(n => n.type === "mine") as BoardNode
     );
     const factory = computed(() => board.nodes.value.find(n => n.type === "factory"));
+    const dowsing = computed(() => board.nodes.value.find(n => n.type === "dowsing"));
 
     function grantResource(type: Resources, amount: DecimalSource) {
         let node = resourceNodes.value[type];
@@ -551,8 +649,12 @@ export const main = createLayer("main", function (this: BaseLayer) {
     }
 
     // Amount of completions that could give you the exact average of each item without any partials
-    const sumMineWeights = (Object.values(mineLootTable) as number[]).reduce((a, b) => a + b);
-    const resourceNames = Object.keys(mineLootTable) as Resources[];
+    const sumMineWeights = computed(() =>
+        (Object.keys(mineLootTable) as Resources[]).reduce(
+            (a, b) => a + new Decimal(dropRates[b].computedModifier.value).toNumber(),
+            0
+        )
+    );
 
     const energyModifier = createSequentialModifier(() => [
         ...resourceNames.map(resource =>
@@ -578,11 +680,11 @@ export const main = createLayer("main", function (this: BaseLayer) {
         createMultiplicativeModifier(() => ({
             multiplier: 2,
             description: tools.stone.name,
-            enabled: () => "stone" in toolNodes.value
+            enabled: () => toolNodes.value["stone"] != null
         })),
         createAdditiveModifier(() => ({
-            addend: () => Decimal.pow10(poweredMachines.value).neg(),
-            description: "Powered Machines (10^n energy/s)",
+            addend: () => Decimal.pow(100, poweredMachines.value).div(10).neg(),
+            description: "Powered Machines (100^n/10 energy/s)",
             enabled: () => Decimal.gt(poweredMachines.value, 0)
         }))
     ]);
@@ -592,7 +694,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
         createMultiplicativeModifier(() => ({
             multiplier: 2,
             description: tools.dirt.name,
-            enabled: () => "dirt" in toolNodes.value
+            enabled: () => toolNodes.value["dirt"] != null
         }))
     ]);
     const computedMiningSpeedModifier = computed(() => miningSpeedModifier.apply(1));
@@ -601,7 +703,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
         createMultiplicativeModifier(() => ({
             multiplier: 2,
             description: tools.gravel.name,
-            enabled: () => "gravel" in toolNodes.value
+            enabled: () => toolNodes.value["gravel"] != null
         }))
     ]);
     const computedMaterialGainModifier = computed(() => materialGainModifier.apply(1));
@@ -610,12 +712,33 @@ export const main = createLayer("main", function (this: BaseLayer) {
         createAdditiveModifier(() => ({
             addend: 0.001,
             description: tools.copper.name,
-            enabled: () => "copper" in toolNodes.value
+            enabled: () => toolNodes.value["copper"] != null
         }))
     ]);
     const computedmaterialLevelEffectModifier = computed(() =>
         materialLevelEffectModifier.apply(1.01)
     );
+
+    const dropRates = (Object.keys(mineLootTable) as Resources[]).reduce((acc, resource) => {
+        const modifier = createSequentialModifier(() => [
+            createMultiplicativeModifier(() => ({
+                multiplier: 2,
+                description: "Dowsing",
+                enabled: () =>
+                    dowsing.value != null &&
+                    isPowered(dowsing.value) &&
+                    (dowsing.value.state as unknown as DowsingState).resources.includes(resource)
+            }))
+        ]);
+        const computedModifier = computed(() => modifier.apply(mineLootTable[resource]));
+        const section = {
+            title: `${camelToTitle(resource)} Drop Rate`,
+            modifier,
+            base: mineLootTable[resource]
+        };
+        acc[resource] = { modifier, computedModifier, section };
+        return acc;
+    }, {} as Record<Resources, { modifier: WithRequired<Modifier, "invert" | "description">; computedModifier: ComputedRef<DecimalSource>; section: Section }>);
 
     const [energyTab, energyTabCollapsed] = createCollapsibleModifierSections(() => [
         {
@@ -631,21 +754,24 @@ export const main = createLayer("main", function (this: BaseLayer) {
             modifier: miningSpeedModifier,
             base: 1,
             unit: "/s",
-            visible: () => "dirt" in toolNodes.value
+            visible: () => toolNodes.value["dirt"] != null
         },
         {
             title: "Ore Dropped",
             modifier: materialGainModifier,
             base: 1,
-            visible: () => "gravel" in toolNodes.value
+            visible: () => toolNodes.value["gravel"] != null
         },
         {
             title: "Material Level Effect",
             modifier: materialLevelEffectModifier,
             base: 1.01,
-            visible: () => "copper" in toolNodes.value
+            visible: () => toolNodes.value["copper"] != null
         }
     ]);
+    const [resourcesTab, resourcesCollapsed] = createCollapsibleModifierSections(() =>
+        Object.values(dropRates).map(d => d.section)
+    );
     const modifierTabs = createTabFamily({
         general: () => ({
             display: "Energy",
@@ -663,6 +789,15 @@ export const main = createLayer("main", function (this: BaseLayer) {
             visibility: () => Object.keys(toolNodes.value).length > 0,
             tab: miningTab,
             miningTabCollapsed
+        }),
+        resources: () => ({
+            display: "Resources",
+            glowColor(): string {
+                return modifierTabs.activeTab.value === this.tab ? "white" : "";
+            },
+            visibility: () => dowsing.value != null,
+            tab: resourcesTab,
+            resourcesCollapsed
         })
     });
     const showModifiersModal = ref(false);
@@ -697,27 +832,27 @@ export const main = createLayer("main", function (this: BaseLayer) {
                 ...(mine.value.state as object),
                 progress: Decimal.sub(progress, completions)
             };
-            const allResourceCompletions = completions.div(sumMineWeights).floor();
+            const allResourceCompletions = completions.div(sumMineWeights.value).floor();
             if (allResourceCompletions.gt(0)) {
                 resourceNames.forEach(resource => {
                     grantResource(
-                        resource as Resources,
+                        resource,
                         Decimal.times(
-                            mineLootTable[resource as Resources] as number,
+                            new Decimal(dropRates[resource].computedModifier.value).toNumber(),
                             allResourceCompletions
                         ).times(computedMaterialGainModifier.value)
                     );
-                    resourceMinedCooldown[resource as Resources] = 0.3;
+                    resourceMinedCooldown[resource] = 0.3;
                 });
             }
             const remainder = Decimal.sub(completions, allResourceCompletions).toNumber();
             for (let i = 0; i < remainder; i++) {
-                const random = Math.floor(Math.random() * sumMineWeights);
+                const random = Math.floor(Math.random() * sumMineWeights.value);
                 let weight = 0;
                 for (let i = 0; i < resourceNames.length; i++) {
                     const resource = resourceNames[i];
-                    weight += mineLootTable[resource];
-                    if (random <= weight) {
+                    weight += new Decimal(dropRates[resource].computedModifier.value).toNumber();
+                    if (random < weight) {
                         grantResource(resource, computedMaterialGainModifier.value);
                         resourceMinedCooldown[resource] = 0.3;
                         break;
@@ -764,7 +899,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
             return (board.selectedNode.value?.state as { powered: boolean }).powered
                 ? Decimal.eq(poweredMachines.value, 1)
                     ? 10
-                    : Decimal.pow10(poweredMachines.value).times(0.9)
+                    : Decimal.pow(100, poweredMachines.value).div(10).times(0.99)
                 : Decimal.neg(nextPowerCost.value);
         }
         return 0;
