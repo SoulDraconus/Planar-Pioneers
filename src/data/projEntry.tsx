@@ -727,6 +727,18 @@ export const main = createLayer("main", function (this: BaseLayer) {
         }
 
         energy.value = Decimal.add(energy.value, Decimal.times(computedEnergyModifier.value, diff));
+
+        if (Decimal.lt(energy.value, 0)) {
+            // Uh oh, time to de-power machines!
+            energy.value = 0;
+            mine.value.state = { ...(mine.value.state as object), powered: false };
+            toast.warning(
+                <div>
+                    <h3>Ran out of energy!</h3>
+                    <div>All machines have been turned off.</div>
+                </div>
+            );
+        }
     });
 
     const energyChange = computed(() => {
