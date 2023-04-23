@@ -145,37 +145,40 @@ export const main = createLayer("main", function (this: BaseLayer) {
         dirt: {
             cost: 1000,
             name: "Unknown Item",
-            type: "unknownType"
+            type: "passive",
+            state: "miningSpeed"
         },
         sand: {
             cost: 1e4,
-            name: "Unknown Item",
-            type: "unknownType"
+            name: "Dowsing Rod",
+            type: "dowsing"
         },
         gravel: {
             cost: 1e5,
             name: "Unknown Item",
-            type: "unknownType"
+            type: "passive",
+            state: "droppedLoot"
         },
         wood: {
             cost: 1e6,
-            name: "Unknown Item",
+            name: "Unknown Item", // (action node)
             type: "unknownType"
         },
         stone: {
             cost: 1e7,
             name: "Unknown Item",
-            type: "unknownType"
+            type: "passive",
+            state: "energyGain"
         },
         coal: {
             cost: 1e8,
-            name: "Unknown Item",
-            type: "unknownType"
+            name: "Tool Empowerer",
+            type: "empowerer"
         },
         copper: {
             cost: 1e9,
-            name: "Unknown Item",
-            type: "unknownType"
+            name: "Unknown Item", // (passive)
+            type: "passive"
         },
         iron: {
             cost: 1e10,
@@ -222,7 +225,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
             name: "Unknown Item",
             type: "unknownType"
         }
-    } satisfies Record<
+    } as Record<
         Resources,
         {
             cost: DecimalSource;
@@ -268,11 +271,11 @@ export const main = createLayer("main", function (this: BaseLayer) {
                     {
                         id: "repair",
                         icon: "build",
-                        tooltip: { text: "Repair - 1000 energy" },
+                        tooltip: { text: "Repair - 100 energy" },
                         onClick(node) {
-                            if (Decimal.gte(energy.value, 1000)) {
+                            if (Decimal.gte(energy.value, 100)) {
                                 node.type = "factory";
-                                energy.value = Decimal.sub(energy.value, 1000);
+                                energy.value = Decimal.sub(energy.value, 100);
                             }
                         },
                         confirmationLabel: () =>
@@ -309,10 +312,17 @@ export const main = createLayer("main", function (this: BaseLayer) {
                             )} energy`
                         }),
                         onClick(node) {
-                            const cost = tools[node.state as Resources].cost;
-                            if (Decimal.gte(energy.value, cost)) {
-                                energy.value = Decimal.sub(energy.value, cost);
-                                // TODO create tool
+                            const tool = tools[node.state as Resources];
+                            if (Decimal.gte(energy.value, tool.cost)) {
+                                energy.value = Decimal.sub(energy.value, tool.cost);
+                                const newNode = {
+                                    id: getUniqueNodeID(board as GenericBoard),
+                                    position: { ...node.position },
+                                    type: tool.type,
+                                    state: tool.state
+                                };
+                                board.placeInAvailableSpace(newNode);
+                                board.nodes.value.push(newNode);
                                 board.selectedAction.value = null;
                                 board.selectedNode.value = null;
                             }
@@ -382,18 +392,13 @@ export const main = createLayer("main", function (this: BaseLayer) {
         let node = resourceNodes.value[type];
         if (node == null) {
             const mine = board.nodes.value.find(n => n.type === "mine") as BoardNode;
-            let x = mine.position.x;
-            x = board.nodes.value
-                .filter(
-                    n => n.position.y < mine.position.y + 50 && n.position.y > mine.position.y - 50
-                )
-                .reduce((x, node) => Math.max(x, node.position.x + 100), 0);
             node = {
                 id: getUniqueNodeID(board),
-                position: { x, y: mine.position.y },
+                position: { ...mine.position },
                 type: "resource",
                 state: { type, amount }
             };
+            board.placeInAvailableSpace(node);
             board.nodes.value.push(node);
         } else {
             const state = node.state as unknown as ResourceState;
@@ -508,7 +513,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
     const energyChange = computed(() => {
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         if (board.selectedAction.value === board.types.brokenFactory.actions![0]) {
-            return -1000;
+            return -100;
         }
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         if (board.selectedAction.value === board.types.factory.actions![0]) {
