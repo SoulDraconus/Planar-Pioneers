@@ -246,13 +246,16 @@ export const main = createLayer("main", function (this: BaseLayer) {
     function grantResource(type: Resources, amount: DecimalSource) {
         let node = resourceNodes.value[type];
         if (node == null) {
-            let x = 0;
+            const mine = board.nodes.value.find(n => n.type === "mine") as BoardNode;
+            let x = mine.position.x;
             x = board.nodes.value
-                .filter(n => n.position.y < 50 && n.position.y > -50)
+                .filter(
+                    n => n.position.y < mine.position.y + 50 && n.position.y > mine.position.y - 50
+                )
                 .reduce((x, node) => Math.max(x, node.position.x + 100), 0);
             node = {
                 id: getUniqueNodeID(board),
-                position: { x, y: 0 },
+                position: { x, y: mine.position.y },
                 type: "resource",
                 state: { type, amount }
             };
