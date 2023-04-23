@@ -56,6 +56,118 @@ const mineLootTable = {
 
 export type Resources = keyof typeof mineLootTable;
 
+const tools = {
+    dirt: {
+        cost: 1000,
+        name: "Pickaxe",
+        type: "passive",
+        state: "dirt"
+    },
+    sand: {
+        cost: 1e4,
+        name: "Dowsing Rod",
+        type: "dowsing"
+    },
+    gravel: {
+        cost: 1e5,
+        name: "Ore Processor",
+        type: "passive",
+        state: "gravel"
+    },
+    wood: {
+        cost: 1e6,
+        name: "Unknown Item", // (action node)
+        type: "unknownType"
+    },
+    stone: {
+        cost: 1e7,
+        name: "Energizer",
+        type: "passive",
+        state: "stone"
+    },
+    coal: {
+        cost: 1e8,
+        name: "Tool Empowerer",
+        type: "empowerer"
+    },
+    copper: {
+        cost: 1e9,
+        name: "Unknown Item", // (passive)
+        type: "passive",
+        state: "copper"
+    },
+    iron: {
+        cost: 1e10,
+        name: "Portal Generator",
+        type: "portalGenerator"
+    },
+    silver: {
+        cost: 1e12,
+        name: "Unknown Item",
+        type: "unknownType"
+    },
+    gold: {
+        cost: 1e15,
+        name: "Unknown Item",
+        type: "unknownType"
+    },
+    emerald: {
+        cost: 1e19,
+        name: "Unknown Item",
+        type: "unknownType"
+    },
+    platinum: {
+        cost: 1e24,
+        name: "Unknown Item",
+        type: "unknownType"
+    },
+    diamond: {
+        cost: 1e30,
+        name: "Unknown Item",
+        type: "unknownType"
+    },
+    berylium: {
+        cost: 1e37,
+        name: "Unknown Item",
+        type: "unknownType"
+    },
+    unobtainium: {
+        cost: 1e45,
+        name: "Unknown Item",
+        type: "unknownType"
+    },
+    ultimatum: {
+        cost: 1e54,
+        name: "Unknown Item",
+        type: "unknownType"
+    }
+} as Record<
+    Resources,
+    {
+        cost: DecimalSource;
+        name: string;
+        type: string;
+        state?: State;
+    }
+>;
+
+const passives = {
+    dirt: {
+        description: "Doubles mining speed"
+    },
+    gravel: {
+        description: "Doubles material drops"
+    },
+    stone: {
+        description: "Doubles energy gain"
+    },
+    copper: {
+        description: "???"
+    }
+} as const;
+
+export type Passives = keyof typeof passives;
+
 /**
  * @hidden
  */
@@ -66,10 +178,16 @@ export const main = createLayer("main", function (this: BaseLayer) {
     const resourceLevelFormula = Formula.variable(0).add(1);
 
     const resourceNodes: ComputedRef<Record<Resources, BoardNode>> = computed(() =>
-        board.nodes.value.reduce((acc, curr) => {
-            if (curr.type === "resource") {
-                acc[(curr.state as unknown as ResourceState).type] = curr;
-            }
+        board.types.resource.nodes.value.reduce((acc, curr) => {
+            acc[(curr.state as unknown as ResourceState).type] = curr;
+            return acc;
+        }, {} as Record<Resources, BoardNode>)
+    );
+
+    const toolNodes: ComputedRef<Record<Resources, BoardNode>> = computed(() =>
+        // TODO add non-passive tools
+        board.types.passive.nodes.value.reduce((acc, curr) => {
+            acc[curr.state as Resources] = curr;
             return acc;
         }, {} as Record<Resources, BoardNode>)
     );
@@ -140,100 +258,6 @@ export const main = createLayer("main", function (this: BaseLayer) {
             );
         });
     });
-
-    const tools = {
-        dirt: {
-            cost: 1000,
-            name: "Unknown Item",
-            type: "passive",
-            state: "miningSpeed"
-        },
-        sand: {
-            cost: 1e4,
-            name: "Dowsing Rod",
-            type: "dowsing"
-        },
-        gravel: {
-            cost: 1e5,
-            name: "Unknown Item",
-            type: "passive",
-            state: "droppedLoot"
-        },
-        wood: {
-            cost: 1e6,
-            name: "Unknown Item", // (action node)
-            type: "unknownType"
-        },
-        stone: {
-            cost: 1e7,
-            name: "Unknown Item",
-            type: "passive",
-            state: "energyGain"
-        },
-        coal: {
-            cost: 1e8,
-            name: "Tool Empowerer",
-            type: "empowerer"
-        },
-        copper: {
-            cost: 1e9,
-            name: "Unknown Item", // (passive)
-            type: "passive"
-        },
-        iron: {
-            cost: 1e10,
-            name: "Portal Generator",
-            type: "portalGenerator"
-        },
-        silver: {
-            cost: 1e12,
-            name: "Unknown Item",
-            type: "unknownType"
-        },
-        gold: {
-            cost: 1e15,
-            name: "Unknown Item",
-            type: "unknownType"
-        },
-        emerald: {
-            cost: 1e19,
-            name: "Unknown Item",
-            type: "unknownType"
-        },
-        platinum: {
-            cost: 1e24,
-            name: "Unknown Item",
-            type: "unknownType"
-        },
-        diamond: {
-            cost: 1e30,
-            name: "Unknown Item",
-            type: "unknownType"
-        },
-        berylium: {
-            cost: 1e37,
-            name: "Unknown Item",
-            type: "unknownType"
-        },
-        unobtainium: {
-            cost: 1e45,
-            name: "Unknown Item",
-            type: "unknownType"
-        },
-        ultimatum: {
-            cost: 1e54,
-            name: "Unknown Item",
-            type: "unknownType"
-        }
-    } as Record<
-        Resources,
-        {
-            cost: DecimalSource;
-            name: string;
-            type: string;
-            state?: State;
-        }
-    >;
 
     const board = createBoard(board => ({
         startNodes: () => [
@@ -313,7 +337,10 @@ export const main = createLayer("main", function (this: BaseLayer) {
                         }),
                         onClick(node) {
                             const tool = tools[node.state as Resources];
-                            if (Decimal.gte(energy.value, tool.cost)) {
+                            if (
+                                Decimal.gte(energy.value, tool.cost) &&
+                                !((node.state as Resources) in toolNodes.value)
+                            ) {
                                 energy.value = Decimal.sub(energy.value, tool.cost);
                                 const newNode = {
                                     id: getUniqueNodeID(board as GenericBoard),
@@ -327,10 +354,17 @@ export const main = createLayer("main", function (this: BaseLayer) {
                                 board.selectedNode.value = null;
                             }
                         },
+                        fillColor: node =>
+                            Decimal.gte(energy.value, tools[node.state as Resources].cost) &&
+                            !((node.state as Resources) in toolNodes.value)
+                                ? "var(--accent2)"
+                                : "var(--danger)",
                         visibility: node => node.state != null,
                         confirmationLabel: node =>
                             Decimal.gte(energy.value, tools[node.state as Resources].cost)
-                                ? { text: "Tap again to confirm" }
+                                ? !((node.state as Resources) in toolNodes.value)
+                                    ? { text: "Tap again to confirm" }
+                                    : { text: "Already crafted", color: "var(--danger)" }
                                 : { text: "Cannot afford", color: "var(--danger)" }
                     },
                     {
@@ -357,7 +391,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
             resource: {
                 shape: Shape.Circle,
                 size: 50,
-                title: node => (node.state as unknown as ResourceState).type,
+                title: node => camelToTitle((node.state as unknown as ResourceState).type),
                 subtitle: node => formatWhole((node.state as unknown as ResourceState).amount),
                 progress: node =>
                     getResourceLevelProgress((node.state as unknown as ResourceState).type),
@@ -366,6 +400,18 @@ export const main = createLayer("main", function (this: BaseLayer) {
                 onClick() {},
                 progressDisplay: ProgressDisplay.Outline,
                 progressColor: "var(--accent3)",
+                draggable: true
+            },
+            passive: {
+                shape: Shape.Circle,
+                size: 50,
+                title: node => tools[node.state as Resources].name,
+                label: node =>
+                    node === board.selectedNode.value
+                        ? {
+                              text: passives[node.state as Passives].description
+                          }
+                        : null,
                 draggable: true
             }
         },
@@ -541,6 +587,11 @@ export const main = createLayer("main", function (this: BaseLayer) {
         energy,
         modifierTabs,
         hasForged,
+        mineLootTable,
+        tools,
+        passives,
+        resourceNodes,
+        toolNodes,
         display: jsx(() => (
             <>
                 <StickyVue class="nav-container">
