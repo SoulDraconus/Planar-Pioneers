@@ -456,12 +456,22 @@ export const main = createLayer("main", function (this: BaseLayer) {
         },
         links() {
             const mine = board.nodes.value.find(n => n.type === "mine") as BoardNode;
-            return Object.keys(resourceMinedCooldown).map(resource => ({
+            const links = Object.keys(resourceMinedCooldown).map(resource => ({
                 startNode: mine,
                 endNode: resourceNodes.value[resource as Resources],
                 stroke: "var(--accent3)",
                 strokeWidth: 5
             }));
+            const factory = board.nodes.value.find(n => n.type === "factory");
+            if (factory != null && factory.state != null) {
+                links.push({
+                    startNode: factory,
+                    endNode: resourceNodes.value[factory.state as Resources],
+                    stroke: "var(--foreground)",
+                    strokeWidth: 4
+                });
+            }
+            return links;
         }
     }));
 
