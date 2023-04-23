@@ -14,7 +14,11 @@ import { createTabFamily } from "features/tabs/tabFamily";
 import Formula, { calculateCost } from "game/formulas/formulas";
 import type { BaseLayer, GenericLayer } from "game/layers";
 import { createLayer } from "game/layers";
-import { createMultiplicativeModifier, createSequentialModifier } from "game/modifiers";
+import {
+    createAdditiveModifier,
+    createMultiplicativeModifier,
+    createSequentialModifier
+} from "game/modifiers";
 import { State, persistent } from "game/persistence";
 import type { Player } from "game/player";
 import player from "game/player";
@@ -92,7 +96,7 @@ const tools = {
     },
     copper: {
         cost: 1e9,
-        name: "Unknown Item", // (passive)
+        name: "Book",
         type: "passive",
         state: "copper"
     },
@@ -162,7 +166,7 @@ const passives = {
         description: "Doubles energy gain"
     },
     copper: {
-        description: "???"
+        description: "Material level is 10% stronger"
     }
 } as const;
 
@@ -459,14 +463,18 @@ export const main = createLayer("main", function (this: BaseLayer) {
     const sumMineWeights = (Object.values(mineLootTable) as number[]).reduce((a, b) => a + b);
     const resourceNames = Object.keys(mineLootTable) as Resources[];
 
-    const energyModifier = createSequentialModifier(() =>
-        resourceNames.map(resource =>
+    const energyModifier = createSequentialModifier(() => [
+        ...resourceNames.map(resource =>
             createMultiplicativeModifier(() => ({
                 description: () =>
                     `${camelToTitle(resource)} (Lv. ${formatWhole(
                         resourceLevels.value[resource]
-                    )})`,
-                multiplier: () => Decimal.pow(1.01, resourceLevels.value[resource]),
+                    )}) (${format(computedmaterialLevelEffectModifier.value)}x per level)`,
+                multiplier: () =>
+                    Decimal.pow(
+                        computedmaterialLevelEffectModifier.value,
+                        resourceLevels.value[resource]
+                    ),
                 enabled: () =>
                     resource in resourceNodes.value &&
                     Decimal.gt(
@@ -475,9 +483,43 @@ export const main = createLayer("main", function (this: BaseLayer) {
                         0
                     )
             }))
-        )
-    );
+        ),
+        createMultiplicativeModifier(() => ({
+            multiplier: 2,
+            description: tools.stone.name,
+            enabled: () => "stone" in toolNodes.value
+        }))
+    ]);
     const computedEnergyModifier = computed(() => energyModifier.apply(1));
+
+    const miningSpeedModifier = createSequentialModifier(() => [
+        createMultiplicativeModifier(() => ({
+            multiplier: 2,
+            description: tools.dirt.name,
+            enabled: () => "dirt" in toolNodes.value
+        }))
+    ]);
+    const computedMiningSpeedModifier = computed(() => miningSpeedModifier.apply(1));
+
+    const materialGainModifier = createSequentialModifier(() => [
+        createMultiplicativeModifier(() => ({
+            multiplier: 2,
+            description: tools.gravel.name,
+            enabled: () => "gravel" in toolNodes.value
+        }))
+    ]);
+    const computedMaterialGainModifier = computed(() => materialGainModifier.apply(1));
+
+    const materialLevelEffectModifier = createSequentialModifier(() => [
+        createAdditiveModifier(() => ({
+            addend: 0.001,
+            description: tools.copper.name,
+            enabled: () => "copper" in toolNodes.value
+        }))
+    ]);
+    const computedmaterialLevelEffectModifier = computed(() =>
+        materialLevelEffectModifier.apply(1.01)
+    );
 
     const [energyTab, energyTabCollapsed] = createCollapsibleModifierSections(() => [
         {
@@ -485,6 +527,27 @@ export const main = createLayer("main", function (this: BaseLayer) {
             modifier: energyModifier,
             base: 1,
             unit: "/s"
+        }
+    ]);
+    const [miningTab, miningTabCollapsed] = createCollapsibleModifierSections(() => [
+        {
+            title: "Mining Speed",
+            modifier: miningSpeedModifier,
+            base: 1,
+            unit: "/s",
+            visible: () => "dirt" in toolNodes.value
+        },
+        {
+            title: "Ore Dropped",
+            modifier: materialGainModifier,
+            base: 1,
+            visible: () => "gravel" in toolNodes.value
+        },
+        {
+            title: "Material Level Effect",
+            modifier: materialLevelEffectModifier,
+            base: 1.01,
+            visible: () => "copper" in toolNodes.value
         }
     ]);
     const modifierTabs = createTabFamily({
@@ -495,6 +558,15 @@ export const main = createLayer("main", function (this: BaseLayer) {
             },
             tab: energyTab,
             energyTabCollapsed
+        }),
+        mining: () => ({
+            display: "Mining",
+            glowColor(): string {
+                return modifierTabs.activeTab.value === this.tab ? "white" : "";
+            },
+            visibility: () => Object.keys(toolNodes.value).length > 0,
+            tab: miningTab,
+            miningTabCollapsed
         })
     });
     const showModifiersModal = ref(false);
@@ -521,7 +593,10 @@ export const main = createLayer("main", function (this: BaseLayer) {
 
         if (board.selectedNode.value?.type === "mine") {
             const mine = board.selectedNode.value;
-            const progress = Decimal.add(mine.state as DecimalSource, diff);
+            const progress = Decimal.add(
+                mine.state as DecimalSource,
+                Decimal.times(computedMiningSpeedModifier.value, diff)
+            );
             const completions = progress.floor();
             mine.state = Decimal.sub(progress, completions);
             const allResourceCompletions = completions.div(sumMineWeights).floor();
@@ -532,7 +607,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
                         Decimal.times(
                             mineLootTable[resource as Resources] as number,
                             allResourceCompletions
-                        )
+                        ).times(computedMaterialGainModifier.value)
                     );
                     resourceMinedCooldown[resource as Resources] = 0.3;
                 });
@@ -545,7 +620,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
                     const resource = resourceNames[i];
                     weight += mineLootTable[resource];
                     if (random <= weight) {
-                        grantResource(resource, 1);
+                        grantResource(resource, computedMaterialGainModifier.value);
                         resourceMinedCooldown[resource] = 0.3;
                         break;
                     }
