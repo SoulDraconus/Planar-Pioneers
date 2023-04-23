@@ -174,7 +174,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
                 title: "🛠️",
                 label: node =>
                     node === board.selectedNode.value ? { text: "Broken Forge" } : null,
-                actionDistance: 80,
+                actionDistance: 100,
                 actions: [
                     {
                         id: "repair",
@@ -207,6 +207,45 @@ export const main = createLayer("main", function (this: BaseLayer) {
                     node === board.selectedNode.value
                         ? { text: hasForged.value ? "Forge" : "Forge - Drag a material to me!" }
                         : null,
+                actionDistance: 100,
+                actions: [
+                    {
+                        id: "deselect",
+                        icon: "",
+                        tooltip: { text: "De-select material" },
+                        onClick(node) {
+                            if (board.selectedAction.value === this) {
+                                node.state = undefined;
+                            } else {
+                                ((board as GenericBoard).state as Persistent<BoardData>).value = {
+                                    ...((board as GenericBoard).state as Persistent<BoardData>)
+                                        .value,
+                                    selectedAction: this.id
+                                };
+                            }
+                            return true;
+                        },
+                        visibility: node => node.state != null
+                    },
+                    {
+                        id: "craft",
+                        icon: "",
+                        tooltip: node => ({ text: "Craft unknown item" }),
+                        onClick(node) {
+                            if (board.selectedAction.value === this) {
+                                // TODO create tool
+                            } else {
+                                ((board as GenericBoard).state as Persistent<BoardData>).value = {
+                                    ...((board as GenericBoard).state as Persistent<BoardData>)
+                                        .value,
+                                    selectedAction: this.id
+                                };
+                            }
+                            return true;
+                        },
+                        visibility: node => node.state != null
+                    }
+                ],
                 draggable: true
             },
             resource: {
