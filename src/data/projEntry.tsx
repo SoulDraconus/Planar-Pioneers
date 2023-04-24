@@ -652,6 +652,18 @@ export const main = createLayer("main", function (this: BaseLayer) {
                                 : { text: "Cannot afford", color: "var(--danger)" }
                     }
                 ],
+                progress: node =>
+                    node.state == null || toolNodes.value[node.state as Resources] != null
+                        ? 0
+                        : Decimal.div(energy.value, tools[node.state as Resources].cost)
+                              .clampMax(1)
+                              .toNumber(),
+                progressDisplay: ProgressDisplay.Fill,
+                progressColor: node =>
+                    node.state != null &&
+                    Decimal.gte(energy.value, tools[node.state as Resources].cost)
+                        ? "var(--accent2)"
+                        : "var(--foreground)",
                 canAccept(node, otherNode) {
                     return otherNode.type === "resource";
                 },
@@ -808,7 +820,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
                 actionDistance: Math.PI / 4,
                 actions: [
                     deselectAllAction,
-                    getIncreaseConnectionsAction(x => x.add(2).pow_base(10000), 16),
+                    getIncreaseConnectionsAction(x => x.add(3).pow_base(1000), 16),
                     togglePoweredAction
                 ],
                 canAccept: canAcceptTool,
