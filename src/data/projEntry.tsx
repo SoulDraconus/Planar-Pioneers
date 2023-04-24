@@ -32,6 +32,7 @@ import { ComputedRef, computed, nextTick, reactive, ref, watch } from "vue";
 import { useToast } from "vue-toastification";
 import { Section, createCollapsibleModifierSections, createFormulaPreview } from "./common";
 import "./main.css";
+import { GenericFormula, InvertibleIntegralFormula } from "game/formulas/types";
 
 const toast = useToast();
 
@@ -306,6 +307,40 @@ export const main = createLayer("main", function (this: BaseLayer) {
             (node.state as { powered: boolean }).powered ? "var(--accent1)" : "var(--locked)"
     };
 
+    function getIncreaseConnectionsAction(
+        cost: (x: InvertibleIntegralFormula) => GenericFormula,
+        maxConnections = Infinity
+    ) {
+        const formula = cost(Formula.variable(0));
+        return {
+            id: "moreConnections",
+            icon: "hub",
+            formula,
+            tooltip(node: BoardNode) {
+                return {
+                    text: `Increase Connections - ${formatWhole(
+                        formula.evaluate((node.state as { maxConnections: number }).maxConnections)
+                    )} energy`
+                };
+            },
+            onClick(node: BoardNode) {
+                const cost = formula.evaluate(
+                    (node.state as { maxConnections: number }).maxConnections
+                );
+                if (Decimal.gte(energy.value, cost)) {
+                    energy.value = Decimal.sub(energy.value, cost);
+                }
+                node.state = {
+                    ...(node.state as object),
+                    maxConnections: (node.state as { maxConnections: number }).maxConnections + 1
+                };
+                board.selectedAction.value = null;
+            },
+            visibility: (node: BoardNode) =>
+                (node.state as { maxConnections: number }).maxConnections < maxConnections
+        };
+    }
+
     const board = createBoard(board => ({
         startNodes: () => [
             { position: { x: 0, y: 0 }, type: "mine", state: { progress: 0, powered: false } },
@@ -512,6 +547,8 @@ export const main = createLayer("main", function (this: BaseLayer) {
                                     : `Dowsing - Doubling ${
                                           (node.state as { resources: Resources[] }).resources
                                               .length
+                                      }/${
+                                          (node.state as { maxConnections: number }).maxConnections
                                       } materials' odds`
                         };
                     }
@@ -547,6 +584,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
                         visibility: node =>
                             (node.state as unknown as DowsingState).resources.length > 0
                     },
+                    getIncreaseConnectionsAction(x => x.add(2).pow_base(100), 16),
                     togglePoweredAction
                 ],
                 classes: node => ({
@@ -898,6 +936,16 @@ export const main = createLayer("main", function (this: BaseLayer) {
         if (board.selectedAction.value === board.types.factory.actions![0]) {
             // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
             return Decimal.neg(tools[board.selectedNode.value!.state as Resources].cost);
+        }
+        if (board.selectedAction.value?.id === "moreConnections") {
+            return Decimal.neg(
+                (
+                    board.selectedAction.value as unknown as { formula: GenericFormula }
+                ).formula.evaluate(
+                    (board.selectedNode.value?.state as unknown as { maxConnections: number })
+                        .maxConnections
+                )
+            );
         }
         return 0;
     });
