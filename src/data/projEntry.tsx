@@ -186,16 +186,20 @@ const tools = {
 
 const passives = {
     dirt: {
-        description: "Doubles mining speed"
+        description: (empowered: boolean) =>
+            empowered ? "Quadruples mining speed" : "Doubles mining speed"
     },
     gravel: {
-        description: "Doubles material drops"
+        description: (empowered: boolean) =>
+            empowered ? "Quadruples material drops" : "Doubles material drops"
     },
     stone: {
-        description: "Doubles energy gain"
+        description: (empowered: boolean) =>
+            empowered ? "Quadruples energy gain" : "Doubles energy gain"
     },
     copper: {
-        description: "Material level is 10% stronger"
+        description: (empowered: boolean) =>
+            empowered ? "Material level is 20% stronger" : "Material level is 10% stronger"
     }
 } as const;
 
@@ -714,7 +718,13 @@ export const main = createLayer("main", function (this: BaseLayer) {
                 label: node =>
                     node === board.selectedNode.value
                         ? {
-                              text: passives[node.state as Passives].description
+                              text: passives[node.state as Passives].description(
+                                  empowerer.value != null &&
+                                      isPowered(empowerer.value) &&
+                                      (
+                                          empowerer.value.state as unknown as EmpowererState
+                                      ).tools.includes(node.state as Passives)
+                              )
                           }
                         : null,
                 outlineColor: "var(--bought)",
@@ -904,7 +914,9 @@ export const main = createLayer("main", function (this: BaseLayer) {
                         startNode: empowerer.value!,
                         endNode: toolNodes.value[tool],
                         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                        stroke: "var(--foreground)",
+                        stroke: isPowered(empowerer.value!)
+                            ? "var(--accent1)"
+                            : "var(--foreground)",
                         strokeWidth: 4
                     });
                 });
@@ -975,8 +987,18 @@ export const main = createLayer("main", function (this: BaseLayer) {
             }))
         ),
         createMultiplicativeModifier(() => ({
-            multiplier: 2,
-            description: tools.stone.name,
+            multiplier: () =>
+                empowerer.value != null &&
+                isPowered(empowerer.value) &&
+                (empowerer.value.state as unknown as EmpowererState).tools.includes("stone")
+                    ? 4
+                    : 2,
+            description: () =>
+                (empowerer.value != null &&
+                isPowered(empowerer.value) &&
+                (empowerer.value.state as unknown as EmpowererState).tools.includes("stone")
+                    ? "Empowered "
+                    : "") + tools.stone.name,
             enabled: () => toolNodes.value["stone"] != null
         })),
         createAdditiveModifier(() => ({
@@ -989,8 +1011,18 @@ export const main = createLayer("main", function (this: BaseLayer) {
 
     const miningSpeedModifier = createSequentialModifier(() => [
         createMultiplicativeModifier(() => ({
-            multiplier: 2,
-            description: tools.dirt.name,
+            multiplier: () =>
+                empowerer.value != null &&
+                isPowered(empowerer.value) &&
+                (empowerer.value.state as unknown as EmpowererState).tools.includes("dirt")
+                    ? 4
+                    : 2,
+            description: () =>
+                (empowerer.value != null &&
+                isPowered(empowerer.value) &&
+                (empowerer.value.state as unknown as EmpowererState).tools.includes("dirt")
+                    ? "Empowered "
+                    : "") + tools.dirt.name,
             enabled: () => toolNodes.value["dirt"] != null
         }))
     ]);
@@ -998,8 +1030,18 @@ export const main = createLayer("main", function (this: BaseLayer) {
 
     const materialGainModifier = createSequentialModifier(() => [
         createMultiplicativeModifier(() => ({
-            multiplier: 2,
-            description: tools.gravel.name,
+            multiplier: () =>
+                empowerer.value != null &&
+                isPowered(empowerer.value) &&
+                (empowerer.value.state as unknown as EmpowererState).tools.includes("gravel")
+                    ? 4
+                    : 2,
+            description: () =>
+                (empowerer.value != null &&
+                isPowered(empowerer.value) &&
+                (empowerer.value.state as unknown as EmpowererState).tools.includes("gravel")
+                    ? "Empowered "
+                    : "") + tools.gravel.name,
             enabled: () => toolNodes.value["gravel"] != null
         }))
     ]);
@@ -1007,8 +1049,18 @@ export const main = createLayer("main", function (this: BaseLayer) {
 
     const materialLevelEffectModifier = createSequentialModifier(() => [
         createAdditiveModifier(() => ({
-            addend: 0.001,
-            description: tools.copper.name,
+            addend: () =>
+                empowerer.value != null &&
+                isPowered(empowerer.value) &&
+                (empowerer.value.state as unknown as EmpowererState).tools.includes("copper")
+                    ? 0.002
+                    : 0.001,
+            description: () =>
+                (empowerer.value != null &&
+                isPowered(empowerer.value) &&
+                (empowerer.value.state as unknown as EmpowererState).tools.includes("copper")
+                    ? "Empowered "
+                    : "") + tools.copper.name,
             enabled: () => toolNodes.value["copper"] != null
         }))
     ]);
