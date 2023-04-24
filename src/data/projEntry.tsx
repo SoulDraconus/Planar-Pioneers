@@ -728,6 +728,14 @@ export const main = createLayer("main", function (this: BaseLayer) {
                           }
                         : null,
                 outlineColor: "var(--bought)",
+                classes: node => ({
+                    "affected-node":
+                        empowerer.value != null &&
+                        isPowered(empowerer.value) &&
+                        (empowerer.value.state as unknown as EmpowererState).tools.includes(
+                            node.state as Passives
+                        )
+                }),
                 draggable: true
             },
             dowsing: {
