@@ -2,7 +2,9 @@ import Modal from "components/Modal.vue";
 import StickyVue from "components/layout/Sticky.vue";
 import {
     BoardNode,
+    BoardNodeLink,
     GenericBoard,
+    NodeLabel,
     ProgressDisplay,
     Shape,
     createBoard,
@@ -52,6 +54,10 @@ export interface DowsingState {
     powered: boolean;
 }
 
+export interface QuarryState extends DowsingState {
+    progress: DecimalSource;
+}
+
 const mineLootTable = {
     dirt: 120,
     sand: 60,
@@ -95,8 +101,9 @@ const tools = {
     },
     wood: {
         cost: 1e6,
-        name: "Unknown Item", // (action node)
-        type: "unknownType"
+        name: "Quarry",
+        type: "quarry",
+        state: { resources: [], maxConnections: 1, powered: false, progress: 0 }
     },
     stone: {
         cost: 1e7,
@@ -208,7 +215,8 @@ export const main = createLayer("main", function (this: BaseLayer) {
             acc[curr.state as Resources] = curr;
             return acc;
         }, {} as Record<Resources, BoardNode>),
-        sand: board.types.dowsing.nodes.value[0]
+        sand: board.types.dowsing.nodes.value[0],
+        wood: board.types.quarry.nodes.value[0]
     }));
 
     const resourceLevels = computed(() =>
@@ -252,6 +260,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
     }
 
     const resourceMinedCooldown: Partial<Record<Resources, number>> = reactive({});
+    const resourceQuarriedCooldown: Partial<Record<Resources, number>> = reactive({});
 
     nextTick(() => {
         resourceNames.forEach(resource => {
@@ -279,14 +288,39 @@ export const main = createLayer("main", function (this: BaseLayer) {
     });
 
     const poweredMachines: ComputedRef<number> = computed(() => {
-        return [mine, dowsing].filter(node => (node.value?.state as { powered: boolean })?.powered)
-            .length;
+        return [mine, dowsing, quarry].filter(
+            node => (node.value?.state as { powered: boolean })?.powered
+        ).length;
     });
     const nextPowerCost = computed(() =>
         Decimal.eq(poweredMachines.value, 0)
             ? 10
             : Decimal.add(poweredMachines.value, 1).pow_base(100).div(10).times(0.99)
     );
+
+    const quarryProgressRequired = computed(() => {
+        if (quarry.value == null) {
+            return 0;
+        }
+        const resources = (quarry.value.state as unknown as QuarryState).resources;
+        return resources.reduce(
+            (acc, curr) => Decimal.div(100, dropRates[curr].computedModifier.value).add(acc),
+            Decimal.dZero
+        );
+    });
+
+    const deselectAllAction = {
+        id: "deselect",
+        icon: "close",
+        tooltip: { text: "Disconnect resources" },
+        onClick(node: BoardNode) {
+            node.state = { ...(node.state as object), resources: [] };
+            board.selectedAction.value = null;
+            board.selectedNode.value = null;
+        },
+        visibility: (node: BoardNode) =>
+            (node.state as { resources: Resources[] }).resources.length > 0
+    };
 
     const togglePoweredAction = {
         id: "toggle",
@@ -339,6 +373,64 @@ export const main = createLayer("main", function (this: BaseLayer) {
             visibility: (node: BoardNode) =>
                 (node.state as { maxConnections: number }).maxConnections < maxConnections
         };
+    }
+
+    function labelForAcceptingResource(
+        node: BoardNode,
+        description: (resource: Resources) => string
+    ): NodeLabel | null {
+        if ((board as GenericBoard).draggingNode.value?.type === "resource") {
+            const resource = (
+                (board as GenericBoard).draggingNode.value?.state as unknown as ResourceState
+            ).type;
+            const { maxConnections, resources } = node.state as unknown as DowsingState;
+            if (resources.includes(resource)) {
+                return { text: "Disconnect", color: "var(--accent2)" };
+            }
+            if (resources.length === maxConnections) {
+                return { text: "Max connections", color: "var(--danger)" };
+            }
+            return {
+                text: description(resource),
+                color: "var(--accent2)"
+            };
+        }
+        return null;
+    }
+
+    function canAcceptResource(node: BoardNode, otherNode: BoardNode) {
+        if (otherNode.type !== "resource") {
+            return false;
+        }
+        const resource = (otherNode.state as unknown as ResourceState).type;
+        const { maxConnections, resources } = node.state as unknown as DowsingState;
+        if (resources.includes(resource)) {
+            return true;
+        }
+        if (resources.length === maxConnections) {
+            return false;
+        }
+        return true;
+    }
+
+    function onDropResource(node: BoardNode, otherNode: BoardNode) {
+        if (otherNode.type !== "resource") {
+            return;
+        }
+        const resource = (otherNode.state as unknown as ResourceState).type;
+        const resources = (node.state as unknown as { resources: Resources[] }).resources;
+        if (resources.includes(resource)) {
+            node.state = {
+                ...(node.state as object),
+                resources: resources.filter(r => r !== resource)
+            };
+        } else {
+            node.state = {
+                ...(node.state as object),
+                resources: [...resources, resource]
+            };
+        }
+        board.selectedNode.value = node;
     }
 
     const board = createBoard(board => ({
@@ -433,6 +525,17 @@ export const main = createLayer("main", function (this: BaseLayer) {
                 actionDistance: Math.PI / 4,
                 actions: [
                     {
+                        id: "deselect",
+                        icon: "close",
+                        tooltip: { text: "Disconnect resource" },
+                        onClick(node) {
+                            node.state = undefined;
+                            board.selectedAction.value = null;
+                            board.selectedNode.value = null;
+                        },
+                        visibility: node => node.state != null
+                    },
+                    {
                         id: "craft",
                         icon: "done",
                         tooltip: node => ({
@@ -472,17 +575,6 @@ export const main = createLayer("main", function (this: BaseLayer) {
                                     ? { text: "Tap again to confirm" }
                                     : { text: "Already crafted", color: "var(--danger)" }
                                 : { text: "Cannot afford", color: "var(--danger)" }
-                    },
-                    {
-                        id: "deselect",
-                        icon: "close",
-                        tooltip: { text: "Disconnect resource" },
-                        onClick(node) {
-                            node.state = undefined;
-                            board.selectedAction.value = null;
-                            board.selectedNode.value = null;
-                        },
-                        visibility: node => node.state != null
                     }
                 ],
                 canAccept(node, otherNode) {
@@ -544,86 +636,76 @@ export const main = createLayer("main", function (this: BaseLayer) {
                             text:
                                 (node.state as unknown as DowsingState).resources.length === 0
                                     ? "Dowsing - Drag a resource to me!"
-                                    : `Dowsing - Doubling ${
+                                    : `Dowsing (${
                                           (node.state as { resources: Resources[] }).resources
                                               .length
                                       }/${
                                           (node.state as { maxConnections: number }).maxConnections
-                                      } materials' odds`
+                                      })`
                         };
                     }
-                    if ((board as GenericBoard).draggingNode.value?.type === "resource") {
-                        const resource = (
-                            (board as GenericBoard).draggingNode.value
-                                ?.state as unknown as ResourceState
-                        ).type;
-                        const { maxConnections, resources } = node.state as unknown as DowsingState;
-                        if (resources.includes(resource)) {
-                            return { text: "Disconnect", color: "var(--accent2)" };
-                        }
-                        if (resources.length === maxConnections) {
-                            return { text: "Max connections", color: "var(--danger)" };
-                        }
-                        return {
-                            text: `Double ${resource} odds`,
-                            color: "var(--accent2)"
-                        };
-                    }
-                    return null;
+                    return labelForAcceptingResource(node, resource => `Double ${resource} odds`);
                 },
                 actionDistance: Math.PI / 4,
                 actions: [
-                    {
-                        id: "deselect",
-                        icon: "close",
-                        tooltip: { text: "Disconnect resources" },
-                        onClick(node) {
-                            node.state = { ...(node.state as object), resources: [] };
-                            board.selectedAction.value = null;
-                            board.selectedNode.value = null;
-                        },
-                        visibility: node =>
-                            (node.state as unknown as DowsingState).resources.length > 0
-                    },
+                    deselectAllAction,
                     getIncreaseConnectionsAction(x => x.add(2).pow_base(100), 16),
                     togglePoweredAction
                 ],
                 classes: node => ({
                     running: isPowered(node)
                 }),
-                canAccept(node, otherNode) {
-                    if (otherNode.type !== "resource") {
-                        return false;
-                    }
-                    const resource = (otherNode.state as unknown as ResourceState).type;
-                    const { maxConnections, resources } = node.state as unknown as DowsingState;
-                    if (resources.includes(resource)) {
-                        return true;
-                    }
-                    if (resources.length === maxConnections) {
-                        return false;
-                    }
-                    return true;
-                },
-                onDrop(node, otherNode) {
-                    if (otherNode.type !== "resource") {
-                        return;
-                    }
-                    const resource = (otherNode.state as unknown as ResourceState).type;
-                    const resources = (node.state as unknown as DowsingState).resources;
-                    if (resources.includes(resource)) {
-                        node.state = {
-                            ...(node.state as object),
-                            resources: resources.filter(r => r !== resource)
-                        };
-                    } else {
-                        node.state = {
-                            ...(node.state as object),
-                            resources: [...resources, resource]
+                canAccept: canAcceptResource,
+                onDrop: onDropResource,
+                draggable: true
+            },
+            quarry: {
+                shape: Shape.Diamond,
+                size: 50,
+                title: "⛏️",
+                label: node => {
+                    if (node === board.selectedNode.value) {
+                        return {
+                            text:
+                                (node.state as unknown as DowsingState).resources.length === 0
+                                    ? "Quarry - Drag a resource to me!"
+                                    : `Quarrying (${
+                                          (node.state as { resources: Resources[] }).resources
+                                              .length
+                                      }/${
+                                          (node.state as { maxConnections: number }).maxConnections
+                                      })`
                         };
                     }
-                    board.selectedNode.value = node;
+                    return labelForAcceptingResource(
+                        node,
+                        resource =>
+                            `Gather ${format(
+                                Decimal.div(dropRates[resource].computedModifier.value, 100)
+                            )} ${resource}/s`
+                    );
                 },
+                actionDistance: Math.PI / 4,
+                actions: [
+                    deselectAllAction,
+                    getIncreaseConnectionsAction(x => x.add(2).pow_base(10000), 16),
+                    togglePoweredAction
+                ],
+                progress: node =>
+                    isPowered(node)
+                        ? Decimal.eq(quarryProgressRequired.value, 0)
+                            ? 0
+                            : new Decimal((node.state as unknown as QuarryState).progress)
+                                  .div(quarryProgressRequired.value)
+                                  .toNumber()
+                        : 0,
+                progressDisplay: ProgressDisplay.Outline,
+                progressColor: "var(--accent2)",
+                canAccept: canAcceptResource,
+                onDrop: onDropResource,
+                classes: node => ({
+                    running: isPowered(node)
+                }),
                 draggable: true
             }
         },
@@ -636,12 +718,15 @@ export const main = createLayer("main", function (this: BaseLayer) {
             overflow: "hidden"
         },
         links() {
-            const links = Object.keys(resourceMinedCooldown).map(resource => ({
-                startNode: mine.value,
-                endNode: resourceNodes.value[resource as Resources],
-                stroke: "var(--accent3)",
-                strokeWidth: 5
-            }));
+            const links: BoardNodeLink[] = [];
+            links.push(
+                ...Object.keys(resourceMinedCooldown).map(resource => ({
+                    startNode: mine.value,
+                    endNode: resourceNodes.value[resource as Resources],
+                    stroke: "var(--accent3)",
+                    strokeWidth: 5
+                }))
+            );
             if (factory.value != null && factory.value.state != null) {
                 links.push({
                     startNode: factory.value,
@@ -662,6 +747,27 @@ export const main = createLayer("main", function (this: BaseLayer) {
                     });
                 });
             }
+            if (quarry.value != null) {
+                (quarry.value.state as unknown as QuarryState).resources.forEach(resource => {
+                    links.push({
+                        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                        startNode: quarry.value!,
+                        endNode: resourceNodes.value[resource],
+                        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                        stroke: "var(--foreground)",
+                        strokeWidth: 4
+                    });
+                });
+            }
+            links.push(
+                ...Object.keys(resourceQuarriedCooldown).map(resource => ({
+                    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                    startNode: quarry.value!,
+                    endNode: resourceNodes.value[resource as Resources],
+                    stroke: "var(--accent3)",
+                    strokeWidth: 5
+                }))
+            );
             return links;
         }
     }));
@@ -670,15 +776,12 @@ export const main = createLayer("main", function (this: BaseLayer) {
         return node === board.selectedNode.value || (node.state as { powered: boolean }).powered;
     }
 
-    const mine: ComputedRef<BoardNode> = computed(
-        () => board.nodes.value.find(n => n.type === "mine") as BoardNode
+    const mine: ComputedRef<BoardNode> = computed(() => board.types.mine.nodes.value[0]);
+    const factory: ComputedRef<BoardNode | undefined> = computed(
+        () => board.types.factory.nodes.value[0]
     );
-    const factory: ComputedRef<BoardNode | undefined> = computed(() =>
-        board.nodes.value.find(n => n.type === "factory")
-    );
-    const dowsing: ComputedRef<BoardNode | undefined> = computed(() =>
-        board.nodes.value.find(n => n.type === "dowsing")
-    );
+    const dowsing: ComputedRef<BoardNode | undefined> = computed(() => toolNodes.value.sand);
+    const quarry: ComputedRef<BoardNode | undefined> = computed(() => toolNodes.value.wood);
 
     function grantResource(type: Resources, amount: DecimalSource) {
         let node = resourceNodes.value[type];
@@ -873,6 +976,14 @@ export const main = createLayer("main", function (this: BaseLayer) {
                 delete resourceMinedCooldown[resource as Resources];
             }
         });
+        Object.keys(resourceQuarriedCooldown).forEach(resource => {
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+            resourceQuarriedCooldown[resource as Resources]! -= diff;
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+            if (resourceQuarriedCooldown[resource as Resources]! <= 0) {
+                delete resourceQuarriedCooldown[resource as Resources];
+            }
+        });
 
         if (isPowered(mine.value)) {
             const progress = Decimal.add(
@@ -909,6 +1020,25 @@ export const main = createLayer("main", function (this: BaseLayer) {
                         resourceMinedCooldown[resource] = 0.3;
                         break;
                     }
+                }
+            }
+        }
+
+        if (quarry.value != null && isPowered(quarry.value)) {
+            const { progress, resources } = quarry.value.state as unknown as QuarryState;
+            if (resources.length > 0) {
+                let newProgress = Decimal.add(progress, diff);
+                const completions = Decimal.div(progress, quarryProgressRequired.value).floor();
+                newProgress = Decimal.sub(
+                    newProgress,
+                    Decimal.times(completions, quarryProgressRequired.value)
+                );
+                quarry.value.state = { ...(quarry.value.state as object), progress: newProgress };
+                if (Decimal.gt(completions, 0)) {
+                    resources.forEach(resource => {
+                        grantResource(resource, completions);
+                        resourceQuarriedCooldown[resource] = 0.3;
+                    });
                 }
             }
         }
