@@ -58,6 +58,12 @@ export interface QuarryState extends DowsingState {
     progress: DecimalSource;
 }
 
+export interface EmpowererState {
+    tools: Passives[];
+    maxConnections: number;
+    powered: boolean;
+}
+
 const mineLootTable = {
     dirt: 120,
     sand: 60,
@@ -114,7 +120,8 @@ const tools = {
     coal: {
         cost: 1e8,
         name: "Tool Empowerer",
-        type: "empowerer"
+        type: "empowerer",
+        state: { tools: [], maxConnections: 1, powered: false }
     },
     copper: {
         cost: 1e9,
@@ -199,7 +206,6 @@ export type Passives = keyof typeof passives;
  */
 export const main = createLayer("main", function (this: BaseLayer) {
     const energy = createResource<DecimalSource>(0, "energy");
-    const hasForged = persistent<boolean>(false);
 
     const resourceLevelFormula = Formula.variable(0).add(1);
 
@@ -216,7 +222,8 @@ export const main = createLayer("main", function (this: BaseLayer) {
             return acc;
         }, {} as Record<Resources, BoardNode>),
         sand: board.types.dowsing.nodes.value[0],
-        wood: board.types.quarry.nodes.value[0]
+        wood: board.types.quarry.nodes.value[0],
+        coal: board.types.empowerer.nodes.value[0]
     }));
 
     const resourceLevels = computed(() =>
@@ -288,7 +295,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
     });
 
     const poweredMachines: ComputedRef<number> = computed(() => {
-        return [mine, dowsing, quarry].filter(
+        return [mine, dowsing, quarry, empowerer].filter(
             node => (node.value?.state as { powered: boolean })?.powered
         ).length;
     });
@@ -312,14 +319,28 @@ export const main = createLayer("main", function (this: BaseLayer) {
     const deselectAllAction = {
         id: "deselect",
         icon: "close",
-        tooltip: { text: "Disconnect resources" },
+        tooltip: (node: BoardNode) => ({
+            text:
+                "resources" in (node.state as object) ? "Disconnect resources" : "Disconnect tools"
+        }),
         onClick(node: BoardNode) {
-            node.state = { ...(node.state as object), resources: [] };
+            if ("resources" in (node.state as object)) {
+                node.state = { ...(node.state as object), resources: [] };
+            } else if ("tools" in (node.state as object)) {
+                node.state = { ...(node.state as object), tools: [] };
+            }
             board.selectedAction.value = null;
             board.selectedNode.value = null;
         },
-        visibility: (node: BoardNode) =>
-            (node.state as { resources: Resources[] }).resources.length > 0
+        visibility: (node: BoardNode) => {
+            if ("resources" in (node.state as object)) {
+                return (node.state as { resources: Resources[] }).resources.length > 0;
+            }
+            if ("tools" in (node.state as object)) {
+                return (node.state as { tools: Passives[] }).tools.length > 0;
+            }
+            return true;
+        }
     };
 
     const togglePoweredAction = {
@@ -398,6 +419,27 @@ export const main = createLayer("main", function (this: BaseLayer) {
         return null;
     }
 
+    function labelForAcceptingTool(
+        node: BoardNode,
+        description: (passive: Passives) => string
+    ): NodeLabel | null {
+        if ((board as GenericBoard).draggingNode.value?.type === "passive") {
+            const passive = (board as GenericBoard).draggingNode.value?.state as Passives;
+            const { maxConnections, tools } = node.state as unknown as EmpowererState;
+            if (tools.includes(passive)) {
+                return { text: "Disconnect", color: "var(--accent2)" };
+            }
+            if (tools.length === maxConnections) {
+                return { text: "Max connections", color: "var(--danger)" };
+            }
+            return {
+                text: description(passive),
+                color: "var(--accent2)"
+            };
+        }
+        return null;
+    }
+
     function canAcceptResource(node: BoardNode, otherNode: BoardNode) {
         if (otherNode.type !== "resource") {
             return false;
@@ -433,6 +475,41 @@ export const main = createLayer("main", function (this: BaseLayer) {
         board.selectedNode.value = node;
     }
 
+    function canAcceptTool(node: BoardNode, otherNode: BoardNode) {
+        if (otherNode.type !== "passive") {
+            return false;
+        }
+        const passive = otherNode.state as Passives;
+        const { maxConnections, tools } = node.state as unknown as EmpowererState;
+        if (tools.includes(passive)) {
+            return true;
+        }
+        if (tools.length === maxConnections) {
+            return false;
+        }
+        return true;
+    }
+
+    function onDropTool(node: BoardNode, otherNode: BoardNode) {
+        if (otherNode.type !== "passive") {
+            return;
+        }
+        const passive = otherNode.state as Passives;
+        const tools = (node.state as unknown as { tools: Passives[] }).tools;
+        if (tools.includes(passive)) {
+            node.state = {
+                ...(node.state as object),
+                tools: tools.filter(r => r !== passive)
+            };
+        } else {
+            node.state = {
+                ...(node.state as object),
+                tools: [...tools, passive]
+            };
+        }
+        board.selectedNode.value = node;
+    }
+
     const board = createBoard(board => ({
         startNodes: () => [
             { position: { x: 0, y: 0 }, type: "mine", state: { progress: 0, powered: false } },
@@ -445,7 +522,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
                 title: "🪨",
                 label: node =>
                     node === board.selectedNode.value
-                        ? { text: "Mining..." }
+                        ? { text: "Mining" }
                         : Object.keys(resourceNodes.value).length === 0
                         ? { text: "Click me!" }
                         : null,
@@ -497,10 +574,8 @@ export const main = createLayer("main", function (this: BaseLayer) {
                         return {
                             text:
                                 node.state == null
-                                    ? hasForged.value
-                                        ? "Forge"
-                                        : "Forge - Drag a resource to me!"
-                                    : `Forge - ${tools[node.state as Resources].name} selected`
+                                    ? "Forge - Drag a resource to me!"
+                                    : `Forging ${tools[node.state as Resources].name}`
                         };
                     }
                     if ((board as GenericBoard).draggingNode.value?.type === "resource") {
@@ -707,6 +782,41 @@ export const main = createLayer("main", function (this: BaseLayer) {
                     running: isPowered(node)
                 }),
                 draggable: true
+            },
+            empowerer: {
+                shape: Shape.Diamond,
+                size: 50,
+                title: "🔌",
+                label: node => {
+                    if (node === board.selectedNode.value) {
+                        return {
+                            text:
+                                (node.state as unknown as EmpowererState).tools.length === 0
+                                    ? "Empowerer - Drag a tool to me!"
+                                    : `Empowering (${
+                                          (node.state as { tools: Passives[] }).tools.length
+                                      }/${
+                                          (node.state as { maxConnections: number }).maxConnections
+                                      })`
+                        };
+                    }
+                    return labelForAcceptingTool(
+                        node,
+                        passive => `Double ${tools[passive].name}'s effect`
+                    );
+                },
+                actionDistance: Math.PI / 4,
+                actions: [
+                    deselectAllAction,
+                    getIncreaseConnectionsAction(x => x.add(2).pow_base(10000), 16),
+                    togglePoweredAction
+                ],
+                canAccept: canAcceptTool,
+                onDrop: onDropTool,
+                classes: node => ({
+                    running: isPowered(node)
+                }),
+                draggable: true
             }
         },
         style: {
@@ -768,6 +878,18 @@ export const main = createLayer("main", function (this: BaseLayer) {
                     strokeWidth: 5
                 }))
             );
+            if (empowerer.value != null) {
+                (empowerer.value.state as unknown as EmpowererState).tools.forEach(tool => {
+                    links.push({
+                        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                        startNode: empowerer.value!,
+                        endNode: toolNodes.value[tool],
+                        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                        stroke: "var(--foreground)",
+                        strokeWidth: 4
+                    });
+                });
+            }
             return links;
         }
     }));
@@ -782,6 +904,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
     );
     const dowsing: ComputedRef<BoardNode | undefined> = computed(() => toolNodes.value.sand);
     const quarry: ComputedRef<BoardNode | undefined> = computed(() => toolNodes.value.wood);
+    const empowerer: ComputedRef<BoardNode | undefined> = computed(() => toolNodes.value.coal);
 
     function grantResource(type: Resources, amount: DecimalSource) {
         let node = resourceNodes.value[type];
@@ -1064,7 +1187,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
             return -100;
         }
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        if (board.selectedAction.value === board.types.factory.actions![0]) {
+        if (board.selectedAction.value === board.types.factory.actions![1]) {
             // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
             return Decimal.neg(tools[board.selectedNode.value!.state as Resources].cost);
         }
@@ -1107,7 +1230,6 @@ export const main = createLayer("main", function (this: BaseLayer) {
         board,
         energy,
         modifierTabs,
-        hasForged,
         mineLootTable,
         tools,
         passives,
