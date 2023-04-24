@@ -357,7 +357,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
                         : Object.keys(resourceNodes.value).length === 0
                         ? { text: "Click me!" }
                         : null,
-                actionDistance: 100,
+                actionDistance: Math.PI / 4,
                 actions: [togglePoweredAction],
                 progress: node =>
                     isPowered(node)
@@ -376,7 +376,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
                 title: "🛠️",
                 label: node =>
                     node === board.selectedNode.value ? { text: "Broken Forge" } : null,
-                actionDistance: 100,
+                actionDistance: Math.PI / 4,
                 actions: [
                     {
                         id: "repair",
@@ -430,7 +430,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
                     }
                     return null;
                 },
-                actionDistance: 100,
+                actionDistance: Math.PI / 4,
                 actions: [
                     {
                         id: "craft",
@@ -571,6 +571,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
                     }
                     return null;
                 },
+                actionDistance: Math.PI / 4,
                 actions: [
                     {
                         id: "deselect",
