@@ -378,6 +378,13 @@ export const main = createLayer("main", function (this: BaseLayer) {
                     )} energy`
                 };
             },
+            confirmationLabel: (node: BoardNode) =>
+                Decimal.gte(
+                    energy.value,
+                    formula.evaluate((node.state as { maxConnections: number }).maxConnections)
+                )
+                    ? { text: "Tap again to confirm" }
+                    : { text: "Cannot afford", color: "var(--danger)" },
             onClick(node: BoardNode) {
                 const cost = formula.evaluate(
                     (node.state as { maxConnections: number }).maxConnections
