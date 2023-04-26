@@ -11,7 +11,7 @@
 	"versionNumber": "0.0",
 	"versionTitle": "Initial Commit",
 
-	"allowGoBack": true,
+	"allowGoBack": false,
 	"defaultShowSmall": false,
 	"defaultDecimalsShown": 2,
 	"useHeader": true,

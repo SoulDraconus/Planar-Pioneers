@@ -14,16 +14,16 @@ import { jsx } from "features/feature";
 import { createResource } from "features/resources/resource";
 import { createTabFamily } from "features/tabs/tabFamily";
 import Formula, { calculateCost } from "game/formulas/formulas";
-import type { BaseLayer, GenericLayer } from "game/layers";
-import { createLayer } from "game/layers";
+import { GenericFormula, InvertibleIntegralFormula } from "game/formulas/types";
+import { BaseLayer, GenericLayer, addLayer, createLayer, layers } from "game/layers";
 import {
     Modifier,
     createAdditiveModifier,
     createMultiplicativeModifier,
     createSequentialModifier
 } from "game/modifiers";
-import { State, persistent } from "game/persistence";
-import type { Player } from "game/player";
+import { State } from "game/persistence";
+import type { LayerData, Player } from "game/player";
 import player from "game/player";
 import settings from "game/settings";
 import Decimal, { DecimalSource } from "lib/break_eternity";
@@ -34,7 +34,7 @@ import { ComputedRef, computed, nextTick, reactive, ref, watch } from "vue";
 import { useToast } from "vue-toastification";
 import { Section, createCollapsibleModifierSections, createFormulaPreview } from "./common";
 import "./main.css";
-import { GenericFormula, InvertibleIntegralFormula } from "game/formulas/types";
+import { GenericPlane, createPlane } from "./planes";
 
 const toast = useToast();
 
@@ -61,6 +61,16 @@ export interface QuarryState extends DowsingState {
 export interface EmpowererState {
     tools: Passives[];
     maxConnections: number;
+    powered: boolean;
+}
+
+export interface PortalGeneratorState {
+    tier: Resources | undefined;
+    influences: string[];
+}
+
+export interface PortalState {
+    id: string;
     powered: boolean;
 }
 
@@ -132,7 +142,8 @@ const tools = {
     iron: {
         cost: 1e10,
         name: "Portal Generator",
-        type: "portalGenerator"
+        type: "portalGenerator",
+        state: { tier: null, influences: [] }
     },
     silver: {
         cost: 1e12,
@@ -227,7 +238,8 @@ export const main = createLayer("main", function (this: BaseLayer) {
         }, {} as Record<Resources, BoardNode>),
         sand: board.types.dowsing.nodes.value[0],
         wood: board.types.quarry.nodes.value[0],
-        coal: board.types.empowerer.nodes.value[0]
+        coal: board.types.empowerer.nodes.value[0],
+        iron: board.types.portalGenerator.nodes.value[0]
     }));
 
     const resourceLevels = computed(() =>
@@ -854,6 +866,156 @@ export const main = createLayer("main", function (this: BaseLayer) {
                     running: isPowered(node)
                 }),
                 draggable: true
+            },
+            portalGenerator: {
+                shape: Shape.Diamond,
+                size: 50,
+                title: "⛩️",
+                label: node => {
+                    if (node === board.selectedNode.value) {
+                        return {
+                            text:
+                                (node.state as unknown as PortalGeneratorState).tier == null
+                                    ? "Portal Spawner - Drag a resource to me!"
+                                    : `Spawning ${
+                                          (node.state as unknown as PortalGeneratorState).tier
+                                      }-tier portal`
+                        };
+                    }
+                    if ((board as GenericBoard).draggingNode.value?.type === "resource") {
+                        const resource = (
+                            (board as GenericBoard).draggingNode.value
+                                ?.state as unknown as ResourceState
+                        ).type;
+                        const text =
+                            (node.state as unknown as PortalGeneratorState).tier === resource
+                                ? "Disconnect"
+                                : `${camelToTitle(resource)}-tier Portal`;
+                        return {
+                            text,
+                            color: "var(--accent2)"
+                        };
+                    }
+                    // TODO handle influences
+                    return null;
+                },
+                actionDistance: Math.PI / 4,
+                actions: [
+                    {
+                        id: "deselect",
+                        icon: "close",
+                        tooltip: { text: "Disconnect all" },
+                        onClick(node: BoardNode) {
+                            node.state = {
+                                ...(node.state as object),
+                                tier: undefined,
+                                influences: []
+                            };
+                            board.selectedAction.value = null;
+                            board.selectedNode.value = null;
+                        },
+                        visibility: (node: BoardNode) => {
+                            const { tier, influences } =
+                                node.state as unknown as PortalGeneratorState;
+                            return tier != null || influences.length > 0;
+                        }
+                    },
+                    {
+                        id: "makePortal",
+                        icon: "done",
+                        tooltip: node => ({
+                            text: `Spawn ${
+                                (node.state as unknown as PortalGeneratorState).tier
+                            }-tier portal`
+                        }),
+                        onClick(node) {
+                            let id = 0;
+                            while (`portal-${id}` in layers) {
+                                id++;
+                            }
+                            addLayer(
+                                createPlane(
+                                    `portal-${id}`,
+                                    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                                    (node.state as unknown as PortalGeneratorState).tier!,
+                                    Math.floor(Math.random() * 4294967296)
+                                ),
+                                player
+                            );
+                            const newNode = {
+                                id: getUniqueNodeID(board as GenericBoard),
+                                position: { ...node.position },
+                                type: "portal",
+                                state: { id: `portal-${id}`, powered: false }
+                            };
+                            board.placeInAvailableSpace(newNode);
+                            board.nodes.value.push(newNode);
+                            board.selectedAction.value = null;
+                            board.selectedNode.value = null;
+                            node.state = { tier: undefined, influences: [] };
+                        },
+                        visibility: node =>
+                            (node.state as unknown as PortalGeneratorState).tier != null
+                    }
+                ],
+                canAccept(node, otherNode) {
+                    return otherNode.type === "resource" || otherNode.type === "influence";
+                },
+                onDrop(node, otherNode) {
+                    if (otherNode.type === "resource") {
+                        const droppedType = (otherNode.state as unknown as ResourceState).type;
+                        const currentType = (node.state as unknown as PortalGeneratorState).tier;
+                        node.state = {
+                            ...(node.state as object),
+                            tier: droppedType === currentType ? undefined : droppedType
+                        };
+                    } else if (otherNode.type === "influence") {
+                        const droppedInfluence = otherNode.state as string;
+                        const currentInfluences = (node.state as unknown as PortalGeneratorState)
+                            .influences;
+                        if (currentInfluences.includes(droppedInfluence)) {
+                            node.state = {
+                                ...(node.state as object),
+                                influences: currentInfluences.filter(i => i !== droppedInfluence)
+                            };
+                        } else {
+                            node.state = {
+                                ...(node.state as object),
+                                influences: [...currentInfluences, droppedInfluence]
+                            };
+                        }
+                    }
+                    board.selectedNode.value = node;
+                },
+                draggable: true
+            },
+            portal: {
+                shape: Shape.Diamond,
+                size: 50,
+                title: "🌀",
+                label: node =>
+                    node === board.selectedNode.value
+                        ? {
+                              text: `Portal to ${
+                                  (
+                                      layers[
+                                          (node.state as unknown as PortalState).id
+                                      ] as GenericPlane
+                                  ).name
+                              }`,
+                              color: (
+                                  layers[(node.state as unknown as PortalState).id] as GenericPlane
+                              ).color
+                          }
+                        : null,
+                actionDistance: Math.PI / 4,
+                actions: [togglePoweredAction],
+                classes: node => ({
+                    running: isPowered(node)
+                }),
+                outlineColor: node =>
+                    (layers[(node.state as unknown as PortalState).id] as GenericPlane).background,
+                draggable: true
             }
         },
         style: {
@@ -929,6 +1091,23 @@ export const main = createLayer("main", function (this: BaseLayer) {
                     });
                 });
             }
+            if (portalGenerator.value != null) {
+                if ((portalGenerator.value.state as unknown as PortalGeneratorState).tier != null) {
+                    links.push({
+                        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                        startNode: portalGenerator.value!,
+                        endNode:
+                            resourceNodes.value[
+                                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                                (portalGenerator.value.state as unknown as PortalGeneratorState)
+                                    .tier!
+                            ],
+                        stroke: "var(--foreground)",
+                        strokeWidth: 4
+                    });
+                }
+                // TODO link to influences
+            }
             return links;
         }
     }));
@@ -944,6 +1123,9 @@ export const main = createLayer("main", function (this: BaseLayer) {
     const dowsing: ComputedRef<BoardNode | undefined> = computed(() => toolNodes.value.sand);
     const quarry: ComputedRef<BoardNode | undefined> = computed(() => toolNodes.value.wood);
     const empowerer: ComputedRef<BoardNode | undefined> = computed(() => toolNodes.value.coal);
+    const portalGenerator: ComputedRef<BoardNode | undefined> = computed(
+        () => toolNodes.value.iron
+    );
 
     function grantResource(type: Resources, amount: DecimalSource) {
         let node = resourceNodes.value[type];
@@ -1304,6 +1486,17 @@ export const main = createLayer("main", function (this: BaseLayer) {
         energyProductionChange
     );
 
+    const activePortals = computed(() => board.types.portal.nodes.value.filter(n => isPowered(n)));
+
+    watch(activePortals, activePortals => {
+        nextTick(() => {
+            player.tabs = [
+                "main",
+                ...activePortals.map(node => (node.state as unknown as PortalState).id)
+            ];
+        });
+    });
+
     return {
         name: "World",
         board,
@@ -1368,7 +1561,22 @@ export const main = createLayer("main", function (this: BaseLayer) {
 export const getInitialLayers = (
     /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
     player: Partial<Player>
-): Array<GenericLayer> => [main];
+): Array<GenericLayer> => {
+    const layers: GenericLayer[] = [main];
+    let id = 0;
+    while (`portal-${id}` in (player.layers ?? {})) {
+        const layer = player.layers?.[`portal-${id}`] as LayerData<GenericPlane>;
+        layers.push(
+            createPlane(
+                `portal-${id}`,
+                layer.tier ?? "dirt",
+                layer.seed ?? Math.floor(Math.random() * 4294967296)
+            )
+        );
+        id++;
+    }
+    return layers;
+};
 
 /**
  * A computed ref whose value is true whenever the game is over.
