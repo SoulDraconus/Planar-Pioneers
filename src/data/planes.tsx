@@ -5,7 +5,12 @@ import { createResource } from "features/resources/resource";
 import { createUpgrade } from "features/upgrades/upgrade";
 import Formula from "game/formulas/formulas";
 import { BaseLayer, createLayer } from "game/layers";
-import { Modifier, createAdditiveModifier, createSequentialModifier } from "game/modifiers";
+import {
+    Modifier,
+    createAdditiveModifier,
+    createMultiplicativeModifier,
+    createSequentialModifier
+} from "game/modifiers";
 import { noPersist, persistent } from "game/persistence";
 import { createCostRequirement } from "game/requirements";
 import { adjectives, colors, uniqueNamesGenerator } from "unique-names-generator";
@@ -71,7 +76,7 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                     for (let j = 0; j < 4; j++) {
                         const upgradeTypeWeights = {
                             add: 1,
-                            mult: 1
+                            mult: i === 0 && j === 0 ? 0 : 1
                         };
                         const sumUpgradeTypeWeights = Object.values(upgradeTypeWeights).reduce(
                             (a, b) => a + b
@@ -79,8 +84,9 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                         const upgradeTypeWeightsKeys = Object.keys(
                             upgradeTypeWeights
                         ) as (keyof typeof upgradeTypeWeights)[];
+                        let weight = 0;
                         let upgradeType: keyof typeof upgradeTypeWeights | null = null;
-                        r = Math.floor(random() * sumUpgradeTypeWeights);
+                        r = random() * sumUpgradeTypeWeights;
                         for (let i = 0; i < upgradeTypeWeightsKeys.length; i++) {
                             const type = upgradeTypeWeightsKeys[i];
                             weight += upgradeTypeWeights[type];
@@ -89,7 +95,7 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                                 break;
                             }
                         }
-                        if (type == null) {
+                        if (upgradeType == null) {
                             continue;
                         }
                         const cost = Decimal.times(difficulty, random() + 0.5)
@@ -109,9 +115,6 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                                 const addend = Decimal.add(cost, 10).pow(random() / 4 + 0.875);
                                 description = `Gain ${format(addend)} ${resource.displayName}/s`;
                                 costFormula = costFormula.step(t.value, c => c.add(addend));
-                                t.value = Decimal.times(difficulty, random() + 0.5)
-                                    .pow_base(2)
-                                    .add(t.value);
                                 resourceModifiers.push(
                                     createAdditiveModifier(() => ({
                                         addend,
@@ -121,7 +124,28 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                                 );
                                 break;
                             }
+                            case "mult": {
+                                const multiplier = random() * 5 + 1;
+                                description = `Multiply ${resource.displayName} gain by ${format(
+                                    multiplier
+                                )}.`;
+                                costFormula = costFormula.step(t.value, c => {
+                                    const beforeStep = Decimal.sub(t.value, c.evaluate());
+                                    return c.add(beforeStep).times(multiplier).sub(beforeStep);
+                                });
+                                resourceModifiers.push(
+                                    createMultiplicativeModifier(() => ({
+                                        multiplier,
+                                        description: title,
+                                        enabled: upgrade.bought
+                                    }))
+                                );
+                                break;
+                            }
                         }
+                        t.value = Decimal.times(difficulty, random() + 0.5)
+                            .pow_base(2)
+                            .add(t.value);
                         const upgradeVisibility = visibility;
                         const upgrade = createUpgrade(() => ({
                             requirements: createCostRequirement(() => ({
