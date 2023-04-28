@@ -94,7 +94,7 @@ const mineLootTable = {
 } as const;
 
 export type Resources = keyof typeof mineLootTable;
-const resourceNames = Object.keys(mineLootTable) as Resources[];
+export const resourceNames = Object.keys(mineLootTable) as Resources[];
 
 const tools = {
     dirt: {
