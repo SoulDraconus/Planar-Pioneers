@@ -168,10 +168,18 @@ export function createPlane(id: string, tier: Resources, seed: number) {
         const resourceChange = computed(() => {
             return 0;
         });
+        const resourceProductionChange = computed(() => {
+            return 0;
+        });
         const resourcePreview = createFormulaPreview(
             Formula.variable(0).add(resource),
             () => Decimal.neq(resourceChange.value, 0),
             resourceChange
+        );
+        const resourceProductionPreview = createFormulaPreview(
+            Formula.variable(0).add(computedResourceGain),
+            () => Decimal.neq(resourceProductionChange.value, 0),
+            resourceProductionChange
         );
 
         return {
@@ -194,13 +202,7 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                             <h2>{name}</h2>
                         </span>
                         <span class="nav-segment">
-                            <h3>{tier}-tier</h3>
-                        </span>
-                        <span class="nav-segment">
-                            <h3 style={`color: ${color}; text-shadow: 0px 0px 10px ${color};`}>
-                                {render(resourcePreview)}
-                            </h3>{" "}
-                            {resource.displayName}
+                            <h3>{tier}</h3>
                         </span>
                         <span class="nav-segment">
                             <button
@@ -212,7 +214,23 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                             </button>
                         </span>
                     </StickyVue>
-                    <SpacerVue />
+                    <StickyVue class="nav-container">
+                        <span class="nav-segment">
+                            <h3 style={`color: ${color}; text-shadow: 0px 0px 10px ${color};`}>
+                                {render(resourcePreview)}
+                            </h3>{" "}
+                            {resource.displayName}
+                        </span>
+                        <span class="nav-segment">
+                            (
+                            <h3 style={`color: ${color}; text-shadow: 0px 0px 10px ${color};`}>
+                                {Decimal.gt(computedResourceGain.value, 0) ? "+" : ""}
+                                {render(resourceProductionPreview)}
+                            </h3>
+                            /s)
+                        </span>
+                    </StickyVue>
+                    <SpacerVue height="50px" />
                     {features.map(row => renderRow(...row))}
                     {render(modifiersModal)}
                 </>
