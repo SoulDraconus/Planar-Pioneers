@@ -19,6 +19,8 @@ import { Resources, resourceNames } from "./projEntry";
 import { getColor, getName, sfc32 } from "./utils";
 import ModalVue from "components/Modal.vue";
 import { addTooltip } from "features/tooltips/tooltip";
+import { createAchievement } from "features/achievements/achievement";
+import { Computable } from "util/computed";
 
 export function createPlane(id: string, tier: Resources, seed: number) {
     return createLayer(id, function (this: BaseLayer) {
@@ -31,7 +33,7 @@ export function createPlane(id: string, tier: Resources, seed: number) {
         const resource = createResource<DecimalSource>(0, getName(random));
         const tierIndex = resourceNames.indexOf(tier);
         const difficulty = random() + tierIndex + 1;
-        const length = random() * (tierIndex + 1) + 1;
+        const length = Math.ceil(random() * (tierIndex + 2));
 
         const resourceModifiers: WithRequired<Modifier, "description" | "invert">[] = [];
         const resourceGainModifier = createSequentialModifier(() => resourceModifiers);
@@ -40,6 +42,7 @@ export function createPlane(id: string, tier: Resources, seed: number) {
         const features: VueFeature[][] = [];
         const t = ref<DecimalSource>(0);
         let costFormula = Formula.variable(t);
+        let visibility: Computable<boolean> = true;
         for (let i = 0; i < length; i++) {
             const featureWeights = {
                 upgrades: 16
@@ -48,7 +51,7 @@ export function createPlane(id: string, tier: Resources, seed: number) {
             const featureWeightsKeys = Object.keys(
                 featureWeights
             ) as (keyof typeof featureWeights)[];
-            const r = Math.floor(random() * sumFeatureWeights);
+            let r = Math.floor(random() * sumFeatureWeights);
             let weight = 0;
             let type: keyof typeof featureWeights | null = null;
             for (let i = 0; i < featureWeightsKeys.length; i++) {
@@ -77,7 +80,7 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                             upgradeTypeWeights
                         ) as (keyof typeof upgradeTypeWeights)[];
                         let upgradeType: keyof typeof upgradeTypeWeights | null = null;
-                        const r = Math.floor(random() * sumUpgradeTypeWeights);
+                        r = Math.floor(random() * sumUpgradeTypeWeights);
                         for (let i = 0; i < upgradeTypeWeightsKeys.length; i++) {
                             const type = upgradeTypeWeightsKeys[i];
                             weight += upgradeTypeWeights[type];
@@ -127,7 +130,8 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                             display: {
                                 title,
                                 description
-                            }
+                            },
+                            visibility
                         }));
                         const eta = estimateTime(resource, computedResourceGain, cost);
                         addTooltip(upgrade, {
@@ -139,6 +143,54 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                     features.push(upgrades);
                     break;
             }
+            const treasureWeights = {
+                dirtGeneration: 16
+            };
+            const sumTreasureWeights = Object.values(treasureWeights).reduce((a, b) => a + b);
+            const treasureWeightsKeys = Object.keys(
+                treasureWeights
+            ) as (keyof typeof treasureWeights)[];
+            r = Math.floor(random() * sumTreasureWeights);
+            weight = 0;
+            let treasureType: keyof typeof treasureWeights | null = null;
+            for (let i = 0; i < treasureWeightsKeys.length; i++) {
+                const type = treasureWeightsKeys[i];
+                weight += treasureWeights[type];
+                if (r < weight) {
+                    treasureType = type;
+                    break;
+                }
+            }
+            if (treasureType == null) {
+                continue; // Should not happen
+            }
+            let description = "";
+            switch (treasureType) {
+                case "dirtGeneration":
+                    description = `Gain ${format(difficulty)} dirt/s while plane is active`;
+                    break;
+            }
+            const cost = Decimal.times(difficulty, random() + 0.5)
+                .pow_base(2)
+                .times(10)
+                .times(costFormula.evaluate());
+            const milestone = createAchievement(() => ({
+                requirements: createCostRequirement(() => ({
+                    resource: noPersist(resource),
+                    cost
+                })),
+                visibility,
+                display: {
+                    requirement: `${format(cost)} ${resource.displayName}`,
+                    effectDisplay: description
+                },
+                style: "width: 100%",
+                classes: {
+                    final: i === length - 1
+                }
+            }));
+            features.push([milestone]);
+            visibility = milestone.earned;
         }
 
         const [resourceTab, resourceTabCollapsed] = createCollapsibleModifierSections(() => [
