@@ -19,7 +19,7 @@ import { Resources, resourceNames } from "./projEntry";
 import { getColor, getName, sfc32 } from "./utils";
 import ModalVue from "components/Modal.vue";
 import { addTooltip } from "features/tooltips/tooltip";
-import { createAchievement } from "features/achievements/achievement";
+import { GenericAchievement, createAchievement } from "features/achievements/achievement";
 import { Computable } from "util/computed";
 
 export function createPlane(id: string, tier: Resources, seed: number) {
@@ -122,6 +122,7 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                                 break;
                             }
                         }
+                        const upgradeVisibility = visibility;
                         const upgrade = createUpgrade(() => ({
                             requirements: createCostRequirement(() => ({
                                 resource: noPersist(resource),
@@ -131,7 +132,7 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                                 title,
                                 description
                             },
-                            visibility
+                            visibility: upgradeVisibility
                         }));
                         const eta = estimateTime(resource, computedResourceGain, cost);
                         addTooltip(upgrade, {
@@ -174,12 +175,13 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                 .pow_base(2)
                 .times(10)
                 .times(costFormula.evaluate());
+            const milestoneVisibility = visibility;
             const milestone = createAchievement(() => ({
                 requirements: createCostRequirement(() => ({
                     resource: noPersist(resource),
                     cost
                 })),
-                visibility,
+                visibility: milestoneVisibility,
                 display: {
                     requirement: `${format(cost)} ${resource.displayName}`,
                     effectDisplay: description
@@ -188,7 +190,7 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                 classes: {
                     final: i === length - 1
                 }
-            }));
+            })) as GenericAchievement;
             features.push([milestone]);
             visibility = milestone.earned;
         }
