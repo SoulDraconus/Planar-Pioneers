@@ -129,10 +129,9 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                                 description
                             }
                         }));
+                        const eta = estimateTime(resource, computedResourceGain, cost);
                         addTooltip(upgrade, {
-                            display: upgrade.bought.value
-                                ? ""
-                                : estimateTime(resource, computedResourceGain, cost),
+                            display: () => (upgrade.bought.value ? "" : eta.value),
                             direction: Direction.Down
                         });
                         upgrades.push(upgrade);
