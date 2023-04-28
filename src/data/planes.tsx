@@ -17,8 +17,8 @@ import { adjectives, colors, uniqueNamesGenerator } from "unique-names-generator
 import Decimal, { DecimalSource } from "util/bignum";
 import { format } from "util/break_eternity";
 import { Direction, WithRequired, camelToTitle } from "util/common";
-import { VueFeature, render, renderRow } from "util/vue";
-import { computed, ref } from "vue";
+import { VueFeature, render, renderRow, trackHover } from "util/vue";
+import { Ref, computed, ref } from "vue";
 import { createCollapsibleModifierSections, createFormulaPreview, estimateTime } from "./common";
 import { Resources, resourceNames } from "./projEntry";
 import { getColor, getName, sfc32 } from "./utils";
@@ -43,6 +43,12 @@ export function createPlane(id: string, tier: Resources, seed: number) {
         const resourceModifiers: WithRequired<Modifier, "description" | "invert">[] = [];
         const resourceGainModifier = createSequentialModifier(() => resourceModifiers);
         const computedResourceGain = computed(() => resourceGainModifier.apply(0));
+
+        const previews: {
+            shouldShowPreview: Ref<boolean>;
+            modifier: Modifier;
+            cost: DecimalSource;
+        }[] = [];
 
         const features: VueFeature[][] = [];
         const t = ref<DecimalSource>(0);
@@ -110,18 +116,17 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                             }) + "ity"
                         );
                         let description = "";
+                        let modifier: WithRequired<Modifier, "description" | "invert">;
                         switch (upgradeType) {
                             case "add": {
                                 const addend = Decimal.add(cost, 10).pow(random() / 4 + 0.875);
                                 description = `Gain ${format(addend)} ${resource.displayName}/s`;
                                 costFormula = costFormula.step(t.value, c => c.add(addend));
-                                resourceModifiers.push(
-                                    createAdditiveModifier(() => ({
-                                        addend,
-                                        description: title,
-                                        enabled: upgrade.bought
-                                    }))
-                                );
+                                modifier = createAdditiveModifier(() => ({
+                                    addend,
+                                    description: title,
+                                    enabled: upgrade.bought
+                                }));
                                 break;
                             }
                             case "mult": {
@@ -133,13 +138,11 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                                     const beforeStep = Decimal.sub(t.value, c.evaluate());
                                     return c.add(beforeStep).times(multiplier).sub(beforeStep);
                                 });
-                                resourceModifiers.push(
-                                    createMultiplicativeModifier(() => ({
-                                        multiplier,
-                                        description: title,
-                                        enabled: upgrade.bought
-                                    }))
-                                );
+                                modifier = createMultiplicativeModifier(() => ({
+                                    multiplier,
+                                    description: title,
+                                    enabled: upgrade.bought
+                                }));
                                 break;
                             }
                         }
@@ -158,6 +161,18 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                             },
                             visibility: upgradeVisibility
                         }));
+                        const isHovering = trackHover(upgrade);
+                        previews.push({
+                            shouldShowPreview: computed(
+                                () =>
+                                    !upgrade.bought.value &&
+                                    upgrade.canPurchase.value &&
+                                    isHovering.value
+                            ),
+                            modifier,
+                            cost
+                        });
+                        resourceModifiers.push(modifier);
                         const eta = estimateTime(resource, computedResourceGain, cost);
                         addTooltip(upgrade, {
                             display: () => (upgrade.bought.value ? "" : eta.value),
@@ -244,9 +259,20 @@ export function createPlane(id: string, tier: Resources, seed: number) {
         });
 
         const resourceChange = computed(() => {
+            const preview = previews.find(p => p.shouldShowPreview.value);
+            if (preview) {
+                return Decimal.neg(preview.cost);
+            }
             return 0;
         });
         const resourceProductionChange = computed(() => {
+            const preview = previews.find(p => p.shouldShowPreview.value);
+            if (preview) {
+                return Decimal.sub(
+                    preview.modifier.apply(computedResourceGain.value),
+                    computedResourceGain.value
+                );
+            }
             return 0;
         });
         const resourcePreview = createFormulaPreview(
