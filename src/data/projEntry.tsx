@@ -1105,8 +1105,22 @@ export const main = createLayer("main", function (this: BaseLayer) {
                         stroke: "var(--foreground)",
                         strokeWidth: 4
                     });
+                    // TODO link to influences
                 }
-                // TODO link to influences
+                links.push(
+                    ...activePortals.value
+                        .map(node =>
+                            (
+                                layers[(node.state as unknown as PortalState).id] as GenericPlane
+                            ).links.value.map(n => ({
+                                startNode: node,
+                                endNode: n.value,
+                                stroke: "var(--accent3)",
+                                strokeWidth: 4
+                            }))
+                        )
+                        .reduce((a, b) => [...a, ...b], [])
+                );
             }
             return links;
         }
@@ -1507,6 +1521,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
         passives,
         resourceNodes,
         toolNodes,
+        grantResource,
         display: jsx(() => (
             <>
                 <StickyVue class="nav-container">

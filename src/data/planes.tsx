@@ -18,14 +18,15 @@ import Decimal, { DecimalSource } from "util/bignum";
 import { format } from "util/break_eternity";
 import { Direction, WithRequired, camelToTitle } from "util/common";
 import { VueFeature, render, renderRow, trackHover } from "util/vue";
-import { Ref, computed, ref } from "vue";
+import { ComputedRef, Ref, computed, ref } from "vue";
 import { createCollapsibleModifierSections, createFormulaPreview, estimateTime } from "./common";
-import { Resources, resourceNames } from "./projEntry";
+import { main, Resources, resourceNames } from "./projEntry";
 import { getColor, getName, sfc32 } from "./utils";
 import ModalVue from "components/Modal.vue";
 import { addTooltip } from "features/tooltips/tooltip";
 import { GenericAchievement, createAchievement } from "features/achievements/achievement";
 import { Computable } from "util/computed";
+import { BoardNode } from "features/boards/board";
 
 export function createPlane(id: string, tier: Resources, seed: number) {
     return createLayer(id, function (this: BaseLayer) {
@@ -205,9 +206,14 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                 continue; // Should not happen
             }
             let description = "";
+            let update: (diff: number) => void;
+            let onComplete: VoidFunction;
+            let link: ComputedRef<BoardNode>;
             switch (treasureType) {
                 case "dirtGeneration":
                     description = `Gain ${format(difficulty)} dirt/s while plane is active`;
+                    update = diff => main.grantResource("dirt", Decimal.times(diff, difficulty));
+                    link = computed(() => main.resourceNodes.value["dirt"]);
                     break;
             }
             const cost = Decimal.times(difficulty, random() + 0.5)
@@ -228,7 +234,10 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                 style: "width: 100%",
                 classes: {
                     final: i === length - 1
-                }
+                },
+                update,
+                onComplete,
+                link
             })) as GenericAchievement;
             features.push([milestone]);
             visibility = milestone.earned;
@@ -256,6 +265,15 @@ export function createPlane(id: string, tier: Resources, seed: number) {
 
         this.on("preUpdate", diff => {
             resource.value = Decimal.times(computedResourceGain.value, diff).add(resource.value);
+
+            for (let i = 1; i < features.length; i += 2) {
+                const treasure = features[i][0] as GenericAchievement & {
+                    update?: (diff: number) => void;
+                };
+                if (treasure.earned.value) {
+                    treasure.update?.(diff);
+                }
+            }
         });
 
         const resourceChange = computed(() => {
@@ -286,6 +304,19 @@ export function createPlane(id: string, tier: Resources, seed: number) {
             resourceProductionChange
         );
 
+        const links = computed(() => {
+            const links = [];
+            for (let i = 1; i < features.length; i += 2) {
+                const treasure = features[i][0] as GenericAchievement & {
+                    link?: ComputedRef<BoardNode>;
+                };
+                if (treasure.earned.value && treasure.link) {
+                    links.push(treasure.link);
+                }
+            }
+            return links;
+        });
+
         return {
             tier: persistent(tier),
             seed: persistent(seed),
@@ -299,6 +330,7 @@ export function createPlane(id: string, tier: Resources, seed: number) {
             },
             features,
             resourceTabCollapsed,
+            links,
             display: jsx(() => (
                 <>
                     <StickyVue class="nav-container">
