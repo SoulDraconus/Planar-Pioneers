@@ -276,6 +276,11 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                 effectedResource,
                 resourceMulti
             })) as GenericAchievement;
+            const eta = estimateTime(resource, computedResourceGain, cost);
+            addTooltip(milestone, {
+                display: () => (milestone.earned.value ? "" : eta.value),
+                direction: Direction.Down
+            });
             features.push([milestone]);
             visibility = milestone.earned;
         }
@@ -402,7 +407,7 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                             <h2>{name}</h2>
                         </span>
                         <span class="nav-segment">
-                            <h3>{tier}</h3>
+                            <h3>{tier}-tier</h3>
                         </span>
                         <span class="nav-segment">
                             <button
@@ -430,7 +435,7 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                             /s)
                         </span>
                     </StickyVue>
-                    <SpacerVue height="50px" />
+                    <SpacerVue height="60px" />
                     {features.map(row => renderRow(...row))}
                     {render(modifiersModal)}
                 </>
