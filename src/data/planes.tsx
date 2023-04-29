@@ -18,14 +18,14 @@ import Decimal, { DecimalSource } from "util/bignum";
 import { format } from "util/break_eternity";
 import { Direction, WithRequired, camelToTitle } from "util/common";
 import { VueFeature, render, renderRow, trackHover } from "util/vue";
-import { ComputedRef, Ref, computed, ref } from "vue";
+import { ComputedRef, Ref, computed, ref, unref } from "vue";
 import { createCollapsibleModifierSections, createFormulaPreview, estimateTime } from "./common";
 import { main, Resources, resourceNames, mineLootTable, ResourceState } from "./projEntry";
 import { getColor, getName, sfc32 } from "./utils";
 import ModalVue from "components/Modal.vue";
 import { addTooltip } from "features/tooltips/tooltip";
 import { GenericAchievement, createAchievement } from "features/achievements/achievement";
-import { Computable } from "util/computed";
+import { Computable, ProcessedComputable } from "util/computed";
 import { BoardNode } from "features/boards/board";
 import { createExponentialModifier } from "game/modifiers";
 
@@ -404,6 +404,40 @@ export function createPlane(id: string, tier: Resources, seed: number) {
             return earned;
         });
 
+        const showNotif = computed(
+            () =>
+                Decimal.lt(earnedTreasures.value.length, length) &&
+                features.some(features =>
+                    features.some(feature => {
+                        if (
+                            "earned" in feature &&
+                            unref(feature.earned as ProcessedComputable<boolean>)
+                        ) {
+                            return false;
+                        }
+                        if (
+                            "bought" in feature &&
+                            unref(feature.bought as ProcessedComputable<boolean>)
+                        ) {
+                            return false;
+                        }
+                        if (
+                            "canClick" in feature &&
+                            unref(feature.canClick as ProcessedComputable<boolean>)
+                        ) {
+                            return true;
+                        }
+                        if (
+                            "canPurchase" in feature &&
+                            unref(feature.canPurchase as ProcessedComputable<boolean>)
+                        ) {
+                            return true;
+                        }
+                        return true;
+                    })
+                )
+        );
+
         return {
             tier: persistent(tier),
             seed: persistent(seed),
@@ -420,6 +454,7 @@ export function createPlane(id: string, tier: Resources, seed: number) {
             links,
             resourceMultis,
             earnedTreasures,
+            showNotif,
             display: jsx(() => (
                 <>
                     <StickyVue class="nav-container">

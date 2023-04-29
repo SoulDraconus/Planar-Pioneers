@@ -1015,7 +1015,9 @@ export const main = createLayer("main", function (this: BaseLayer) {
                 actionDistance: Math.PI / 4,
                 actions: [togglePoweredAction],
                 classes: node => ({
-                    running: isPowered(node)
+                    running: isPowered(node),
+                    showNotif: (layers[(node.state as unknown as PortalState).id] as GenericPlane)
+                        .showNotif.value
                 }),
                 outlineColor: node =>
                     (layers[(node.state as unknown as PortalState).id] as GenericPlane).background,
