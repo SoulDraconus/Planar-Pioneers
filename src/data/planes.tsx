@@ -28,6 +28,13 @@ import { GenericAchievement, createAchievement } from "features/achievements/ach
 import { Computable } from "util/computed";
 import { BoardNode } from "features/boards/board";
 
+export type Treasure = GenericAchievement & {
+    update?: (diff: number) => void;
+    link?: ComputedRef<BoardNode>;
+    effectedResource?: Resources | "energy";
+    resourceMulti: DecimalSource;
+};
+
 export function createPlane(id: string, tier: Resources, seed: number) {
     return createLayer(id, function (this: BaseLayer) {
         const random = sfc32(0, seed >> 0, seed >> 32, 1);
@@ -275,7 +282,7 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                 link,
                 effectedResource,
                 resourceMulti
-            })) as GenericAchievement;
+            })) satisfies Treasure as GenericAchievement;
             const eta = estimateTime(resource, computedResourceGain, cost);
             addTooltip(milestone, {
                 display: () => (milestone.earned.value ? "" : eta.value),
@@ -308,14 +315,9 @@ export function createPlane(id: string, tier: Resources, seed: number) {
         this.on("preUpdate", diff => {
             resource.value = Decimal.times(computedResourceGain.value, diff).add(resource.value);
 
-            for (let i = 1; i < features.length; i += 2) {
-                const treasure = features[i][0] as GenericAchievement & {
-                    update?: (diff: number) => void;
-                };
-                if (treasure.earned.value) {
-                    treasure.update?.(diff);
-                }
-            }
+            earnedTreasures.value.forEach(treasure => {
+                treasure.update?.(diff);
+            });
         });
 
         const resourceChange = computed(() => {
@@ -347,30 +349,19 @@ export function createPlane(id: string, tier: Resources, seed: number) {
         );
 
         const links = computed(() => {
-            const links = [];
-            for (let i = 1; i < features.length; i += 2) {
-                const treasure = features[i][0] as GenericAchievement & {
-                    link?: ComputedRef<BoardNode>;
-                };
-                if (treasure.earned.value && treasure.link) {
+            const links: ComputedRef<BoardNode>[] = [];
+            earnedTreasures.value.forEach(treasure => {
+                if (treasure.link) {
                     links.push(treasure.link);
                 }
-            }
+            });
             return links;
         });
 
         const resourceMultis = computed(() => {
             const multis: Partial<Record<Resources | "energy", DecimalSource>> = {};
-            for (let i = 1; i < features.length; i += 2) {
-                const treasure = features[i][0] as GenericAchievement & {
-                    effectedResource?: Resources | "energy";
-                    resourceMulti: DecimalSource;
-                };
-                if (
-                    treasure.earned.value &&
-                    treasure.effectedResource != null &&
-                    treasure.resourceMulti != null
-                ) {
+            earnedTreasures.value.forEach(treasure => {
+                if (treasure.effectedResource != null && treasure.resourceMulti != null) {
                     if (multis[treasure.effectedResource] != null) {
                         multis[treasure.effectedResource] = Decimal.times(
                             // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
@@ -381,8 +372,19 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                         multis[treasure.effectedResource] = treasure.resourceMulti;
                     }
                 }
-            }
+            });
             return multis;
+        });
+
+        const earnedTreasures = computed(() => {
+            const earned: Treasure[] = [];
+            for (let i = 1; i < features.length; i += 2) {
+                const treasure = features[i][0] as Treasure;
+                if (treasure.earned.value) {
+                    earned.push(treasure);
+                }
+            }
+            return earned;
         });
 
         return {
@@ -400,6 +402,7 @@ export function createPlane(id: string, tier: Resources, seed: number) {
             resourceTabCollapsed,
             links,
             resourceMultis,
+            earnedTreasures,
             display: jsx(() => (
                 <>
                     <StickyVue class="nav-container">
@@ -439,6 +442,15 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                     {features.map(row => renderRow(...row))}
                     {render(modifiersModal)}
                 </>
+            )),
+            minimizedDisplay: jsx(() => (
+                <div>
+                    <span>{name}</span>
+                    <span style="font-size: large; vertical-align: sub;">
+                        {" "}
+                        {earnedTreasures.value.length}/{length} treasures
+                    </span>
+                </div>
             ))
         };
     });
