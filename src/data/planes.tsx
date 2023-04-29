@@ -20,7 +20,7 @@ import { Direction, WithRequired, camelToTitle } from "util/common";
 import { VueFeature, render, renderRow, trackHover } from "util/vue";
 import { ComputedRef, Ref, computed, ref } from "vue";
 import { createCollapsibleModifierSections, createFormulaPreview, estimateTime } from "./common";
-import { main, Resources, resourceNames } from "./projEntry";
+import { main, Resources, resourceNames, mineLootTable, ResourceState } from "./projEntry";
 import { getColor, getName, sfc32 } from "./utils";
 import ModalVue from "components/Modal.vue";
 import { addTooltip } from "features/tooltips/tooltip";
@@ -185,7 +185,10 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                     break;
             }
             const treasureWeights = {
-                dirtGeneration: 16
+                cache: 100,
+                generation: 10,
+                resourceMulti: 5,
+                energyMulti: 5
             };
             const sumTreasureWeights = Object.values(treasureWeights).reduce((a, b) => a + b);
             const treasureWeightsKeys = Object.keys(
@@ -209,11 +212,43 @@ export function createPlane(id: string, tier: Resources, seed: number) {
             let update: (diff: number) => void;
             let onComplete: VoidFunction;
             let link: ComputedRef<BoardNode>;
+            let randomResource: Resources;
+            let effectedResource: Resources | "energy";
+            let resourceMulti: DecimalSource;
             switch (treasureType) {
-                case "dirtGeneration":
-                    description = `Gain ${format(difficulty)} dirt/s while plane is active`;
-                    update = diff => main.grantResource("dirt", Decimal.times(diff, difficulty));
-                    link = computed(() => main.resourceNodes.value["dirt"]);
+                case "cache":
+                    randomResource = getRandomResource(random);
+                    description = `Gain ${format(difficulty)}x your current ${randomResource}.`;
+                    onComplete = () =>
+                        main.grantResource(
+                            randomResource,
+                            Decimal.times(
+                                (
+                                    main.resourceNodes.value[randomResource]
+                                        ?.state as unknown as ResourceState | null
+                                )?.amount ?? 0,
+                                difficulty
+                            )
+                        );
+                    break;
+                case "generation":
+                    randomResource = getRandomResource(random);
+                    const gain = Decimal.div(difficulty, 120).times(mineLootTable[randomResource]);
+                    description = `Gain ${format(gain)} ${randomResource}/s while plane is active.`;
+                    update = diff => main.grantResource(randomResource, Decimal.times(diff, gain));
+                    link = computed(() => main.resourceNodes.value[randomResource]);
+                    break;
+                case "resourceMulti":
+                    effectedResource = randomResource = getRandomResource(random);
+                    resourceMulti = Decimal.div(difficulty, 17).pow_base(2);
+                    description = `Gain ${format(
+                        resourceMulti
+                    )}x ${randomResource} while plane is active.`;
+                    break;
+                case "energyMulti":
+                    effectedResource = "energy";
+                    resourceMulti = Decimal.div(difficulty, 17);
+                    description = `Gain ${format(resourceMulti)}x energy while plane is active.`;
                     break;
             }
             const cost = Decimal.times(difficulty, random() + 0.5)
@@ -237,7 +272,9 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                 },
                 update,
                 onComplete,
-                link
+                link,
+                effectedResource,
+                resourceMulti
             })) as GenericAchievement;
             features.push([milestone]);
             visibility = milestone.earned;
@@ -317,6 +354,32 @@ export function createPlane(id: string, tier: Resources, seed: number) {
             return links;
         });
 
+        const resourceMultis = computed(() => {
+            const multis: Partial<Record<Resources | "energy", DecimalSource>> = {};
+            for (let i = 1; i < features.length; i += 2) {
+                const treasure = features[i][0] as GenericAchievement & {
+                    effectedResource?: Resources | "energy";
+                    resourceMulti: DecimalSource;
+                };
+                if (
+                    treasure.earned.value &&
+                    treasure.effectedResource != null &&
+                    treasure.resourceMulti != null
+                ) {
+                    if (multis[treasure.effectedResource] != null) {
+                        multis[treasure.effectedResource] = Decimal.times(
+                            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                            multis[treasure.effectedResource]!,
+                            treasure.resourceMulti
+                        );
+                    } else {
+                        multis[treasure.effectedResource] = treasure.resourceMulti;
+                    }
+                }
+            }
+            return multis;
+        });
+
         return {
             tier: persistent(tier),
             seed: persistent(seed),
@@ -331,6 +394,7 @@ export function createPlane(id: string, tier: Resources, seed: number) {
             features,
             resourceTabCollapsed,
             links,
+            resourceMultis,
             display: jsx(() => (
                 <>
                     <StickyVue class="nav-container">
@@ -373,6 +437,25 @@ export function createPlane(id: string, tier: Resources, seed: number) {
             ))
         };
     });
+}
+
+// Using separate method from what's used in mining, because planes are influenced by influences and not things like dowsing
+function getRandomResource(random: () => number) {
+    const sumResourceWeights = (Object.values(mineLootTable) as number[]).reduce((a, b) => a + b);
+    const resourceWeightsKeys = Object.keys(mineLootTable) as Resources[];
+    const r = Math.floor(random() * sumResourceWeights);
+    let weight = 0;
+    let resource: Resources;
+    for (let i = 0; i < resourceWeightsKeys.length; i++) {
+        const type = resourceWeightsKeys[i];
+        weight += mineLootTable[type];
+        if (r < weight) {
+            resource = type;
+            break;
+        }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    return resource!;
 }
 
 export type GenericPlane = ReturnType<typeof createPlane>;

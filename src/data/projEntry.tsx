@@ -74,7 +74,7 @@ export interface PortalState {
     powered: boolean;
 }
 
-const mineLootTable = {
+export const mineLootTable = {
     dirt: 120,
     sand: 60,
     gravel: 40,
@@ -202,7 +202,7 @@ const passives = {
     },
     gravel: {
         description: (empowered: boolean) =>
-            empowered ? "Quadruples material drops" : "Doubles material drops"
+            empowered ? "Quadruples mine ore drops" : "Doubles mine ore drops"
     },
     stone: {
         description: (empowered: boolean) =>
@@ -715,10 +715,14 @@ export const main = createLayer("main", function (this: BaseLayer) {
                 progressColor: "var(--accent3)",
                 classes: node => ({
                     "affected-node":
-                        dowsing.value != null &&
-                        isPowered(dowsing.value) &&
-                        (dowsing.value.state as unknown as DowsingState).resources.includes(
-                            (node.state as unknown as ResourceState).type
+                        (dowsing.value != null &&
+                            isPowered(dowsing.value) &&
+                            (dowsing.value.state as unknown as DowsingState).resources.includes(
+                                (node.state as unknown as ResourceState).type
+                            )) ||
+                        Decimal.neq(
+                            planarMultis.value[(node.state as unknown as ResourceState).type] ?? 1,
+                            1
                         )
                 }),
                 draggable: true
@@ -1107,20 +1111,34 @@ export const main = createLayer("main", function (this: BaseLayer) {
                     });
                     // TODO link to influences
                 }
-                links.push(
-                    ...activePortals.value
-                        .map(node =>
-                            (
-                                layers[(node.state as unknown as PortalState).id] as GenericPlane
-                            ).links.value.map(n => ({
+                (board as GenericBoard).types.portal.nodes.value.forEach(node => {
+                    const plane = layers[(node.state as unknown as PortalState).id] as GenericPlane;
+                    plane.links.value.forEach(n => {
+                        if (n.value != null) {
+                            links.push({
                                 startNode: node,
                                 endNode: n.value,
-                                stroke: "var(--accent3)",
+                                stroke: isPowered(node) ? "var(--accent3)" : "var(--foreground)",
                                 strokeWidth: 4
-                            }))
-                        )
-                        .reduce((a, b) => [...a, ...b], [])
-                );
+                            });
+                        }
+                    });
+                    (Object.keys(plane.resourceMultis.value) as (Resources | "energy")[]).forEach(
+                        type => {
+                            if (type !== "energy" && type in resourceNodes.value) {
+                                links.push({
+                                    startNode: node,
+                                    endNode: resourceNodes.value[type],
+                                    stroke: isPowered(node)
+                                        ? "var(--accent1)"
+                                        : "var(--foreground)",
+                                    strokeWidth: 4
+                                });
+                            }
+                        }
+                    );
+                    return links;
+                });
             }
             return links;
         }
@@ -1143,6 +1161,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
 
     function grantResource(type: Resources, amount: DecimalSource) {
         let node = resourceNodes.value[type];
+        amount = Decimal.times(amount, resourceGain[type].computedModifier.value);
         if (node == null) {
             node = {
                 id: getUniqueNodeID(board),
@@ -1168,6 +1187,26 @@ export const main = createLayer("main", function (this: BaseLayer) {
             0
         )
     );
+
+    const planarMultis = computed(() => {
+        const multis: Partial<Record<Resources | "energy", DecimalSource>> = {};
+        board.types.portal.nodes.value.forEach(n => {
+            if (!isPowered(n)) {
+                return;
+            }
+            const plane = layers[(n.state as unknown as PortalState).id] as GenericPlane;
+            const planeMultis = plane.resourceMultis.value;
+            (Object.keys(planeMultis) as (Resources | "energy")[]).forEach(type => {
+                if (multis[type] != null) {
+                    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                    multis[type] = Decimal.times(multis[type]!, planeMultis[type]!);
+                } else {
+                    multis[type] = planeMultis[type];
+                }
+            });
+        });
+        return multis;
+    });
 
     const energyModifier = createSequentialModifier(() => [
         ...resourceNames.map(resource =>
@@ -1204,6 +1243,11 @@ export const main = createLayer("main", function (this: BaseLayer) {
                     ? "Empowered "
                     : "") + tools.stone.name,
             enabled: () => toolNodes.value["stone"] != null
+        })),
+        createMultiplicativeModifier(() => ({
+            multiplier: () => planarMultis.value.energy ?? 1,
+            description: "Planar Treasures",
+            enabled: () => Decimal.neq(planarMultis.value.energy ?? 1, 1)
         })),
         createAdditiveModifier(() => ({
             addend: () => Decimal.pow(100, poweredMachines.value).div(10).neg(),
@@ -1293,6 +1337,23 @@ export const main = createLayer("main", function (this: BaseLayer) {
         return acc;
     }, {} as Record<Resources, { modifier: WithRequired<Modifier, "invert" | "description">; computedModifier: ComputedRef<DecimalSource>; section: Section }>);
 
+    const resourceGain = (Object.keys(mineLootTable) as Resources[]).reduce((acc, resource) => {
+        const modifier = createSequentialModifier(() => [
+            createMultiplicativeModifier(() => ({
+                multiplier: () => planarMultis.value[resource] ?? 1,
+                description: "Planar Treasures",
+                enabled: () => Decimal.neq(planarMultis.value[resource] ?? 1, 1)
+            }))
+        ]);
+        const computedModifier = computed(() => modifier.apply(1));
+        const section = {
+            title: `${camelToTitle(resource)} Gain`,
+            modifier
+        };
+        acc[resource] = { modifier, computedModifier, section };
+        return acc;
+    }, {} as Record<Resources, { modifier: WithRequired<Modifier, "invert" | "description">; computedModifier: ComputedRef<DecimalSource>; section: Section }>);
+
     const [energyTab, energyTabCollapsed] = createCollapsibleModifierSections(() => [
         {
             title: "Energy Gain",
@@ -1325,6 +1386,9 @@ export const main = createLayer("main", function (this: BaseLayer) {
     const [resourcesTab, resourcesCollapsed] = createCollapsibleModifierSections(() =>
         Object.values(dropRates).map(d => d.section)
     );
+    const [resourceGainTab, resourceGainCollapsed] = createCollapsibleModifierSections(() =>
+        Object.values(resourceGain).map(d => d.section)
+    );
     const modifierTabs = createTabFamily({
         general: () => ({
             display: "Energy",
@@ -1335,7 +1399,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
             energyTabCollapsed
         }),
         mining: () => ({
-            display: "Mining",
+            display: "Mine",
             glowColor(): string {
                 return modifierTabs.activeTab.value === this.tab ? "white" : "";
             },
@@ -1344,13 +1408,23 @@ export const main = createLayer("main", function (this: BaseLayer) {
             miningTabCollapsed
         }),
         resources: () => ({
-            display: "Resources",
+            display: "Mine Rates",
             glowColor(): string {
                 return modifierTabs.activeTab.value === this.tab ? "white" : "";
             },
             visibility: () => dowsing.value != null,
             tab: resourcesTab,
             resourcesCollapsed
+        }),
+        resourcesGain: () => ({
+            display: "Resource Gain",
+            glowColor(): string {
+                return modifierTabs.activeTab.value === this.tab ? "white" : "";
+            },
+            visibility: () =>
+                Object.values(resourceGain).some(r => Decimal.neq(r.computedModifier.value, 1)),
+            tab: resourceGainTab,
+            resourceGainCollapsed
         })
     });
     const showModifiersModal = ref(false);
