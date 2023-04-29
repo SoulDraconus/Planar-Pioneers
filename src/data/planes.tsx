@@ -27,6 +27,7 @@ import { addTooltip } from "features/tooltips/tooltip";
 import { GenericAchievement, createAchievement } from "features/achievements/achievement";
 import { Computable } from "util/computed";
 import { BoardNode } from "features/boards/board";
+import { createExponentialModifier } from "game/modifiers";
 
 export type Treasure = GenericAchievement & {
     update?: (diff: number) => void;
@@ -90,7 +91,8 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                     for (let j = 0; j < 4; j++) {
                         const upgradeTypeWeights = {
                             add: 1,
-                            mult: i === 0 && j === 0 ? 0 : 1
+                            mult: i === 0 && j === 0 ? 0 : 1,
+                            pow: i === 0 ? 0 : 0.5
                         };
                         const sumUpgradeTypeWeights = Object.values(upgradeTypeWeights).reduce(
                             (a, b) => a + b
@@ -152,6 +154,21 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                                     enabled: upgrade.bought
                                 }));
                                 break;
+                            }
+                            case "pow": {
+                                const exponent = random() / 5 + 1;
+                                description = `Raise ${resource.displayName} gain to the ^${format(
+                                    exponent
+                                )}`;
+                                costFormula = costFormula.step(t.value, c => {
+                                    const beforeStep = Decimal.sub(t.value, c.evaluate());
+                                    return c.add(beforeStep).pow(exponent).sub(beforeStep);
+                                });
+                                modifier = createExponentialModifier(() => ({
+                                    exponent,
+                                    description: title,
+                                    enabled: upgrade.bought
+                                }));
                             }
                         }
                         t.value = Decimal.times(difficulty, random() + 0.5)
