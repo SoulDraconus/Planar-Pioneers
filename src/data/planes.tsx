@@ -39,6 +39,7 @@ import {
 import type { ResourceState, Resources, PortalState } from "./projEntry";
 import { getColor, getName, sfc32 } from "./utils";
 import { useToast } from "vue-toastification";
+import TooltipVue from "features/tooltips/Tooltip.vue";
 
 const toast = useToast();
 
@@ -624,13 +625,33 @@ export function createPlane(
             showNotif,
             display: jsx(() => (
                 <>
-                    <StickyVue class="nav-container">
+                    <StickyVue class="nav-container" style="z-index: 5">
                         <span class="nav-segment">
                             <h2>{name}</h2>
                         </span>
                         <span class="nav-segment">
                             <h3>{tier}-tier</h3>
                         </span>
+                        {influences.length === 0 ? null : (
+                            <span class="nav-segment">
+                                <TooltipVue
+                                    display={influences
+                                        .map(influence => {
+                                            const description =
+                                                influenceTypes[influence.type].description;
+                                            if (typeof description === "function") {
+                                                return description(influence);
+                                            }
+                                            return description;
+                                        })
+                                        .join("<br/>")}
+                                    direction={Direction.Down}
+                                    style={"width: 300px"}
+                                >
+                                    <h3>{influences.length} influences</h3>
+                                </TooltipVue>
+                            </span>
+                        )}
                         <span class="nav-segment">
                             <button
                                 class="button"

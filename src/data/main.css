@@ -8,10 +8,14 @@
     width: 100%;
 }
 
-.nav-segment {
+.nav-segment:not(:last-child) {
     border-right: solid 1px var(--outline);
     padding-right: 10px; 
     margin-right: 10px;
+}
+
+.nav-segment .tooltip-container {
+    display: inline;
 }
 
 .affected-node {
