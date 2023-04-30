@@ -223,6 +223,7 @@ export type Passives = keyof typeof passives;
 
 export const influences = {
     increaseResources: {
+        display: "+resource",
         description: (state: InfluenceState) => {
             const resources = state.data as Resources[];
             if (resources.length === 0) {
@@ -237,6 +238,7 @@ export const influences = {
         initialData: []
     },
     decreaseResources: {
+        display: "-resource",
         description: (state: InfluenceState) => {
             const resources = state.data as Resources[];
             if (resources.length === 0) {
@@ -251,51 +253,61 @@ export const influences = {
         initialData: []
     },
     increaseLength: {
+        display: "+length",
         description: "Increase length",
         cost: 100,
         initialData: undefined
     },
     increaseCaches: {
+        display: "+caches",
         description: "Increase caches odds",
         cost: 10,
         initialData: undefined
     },
     increaseGens: {
+        display: "+gens",
         description: "Increase generators odds",
         cost: 10,
         initialData: undefined
     },
     increaseInfluences: {
+        display: "+influences",
         description: "Increase influences odds",
         cost: 10,
         initialData: undefined
     },
     increaseEnergyMults: {
+        display: "+energy mults",
         description: "Increase energy mults odds",
         cost: 10,
         initialData: undefined
     },
     increaseResourceMults: {
+        display: "+resource mults",
         description: "Increase resource mults odds",
         cost: 10,
         initialData: undefined
     },
     increaseDiff: {
+        display: "+diff",
         description: "Increase difficulty/rewards odds",
         cost: 10,
         initialData: undefined
     },
     decreaseDiff: {
+        display: "-diff",
         description: "Decrease difficulty/rewards odds",
         cost: 10,
         initialData: undefined
     },
     increaseRewards: {
+        display: "+rewards",
         description: "Increase rewards level",
         cost: 1e4,
         initialData: undefined
     }
     // relic: {
+    //     display: "+relic",
     //     description: "Max length/difficulty, add tier-unique relic",
     //     cost: 1e6,
     //     initialData: undefined
@@ -303,6 +315,7 @@ export const influences = {
 } as const satisfies Record<
     string,
     {
+        display: string;
         description: string | ((state: InfluenceState) => string);
         cost: DecimalSource;
         initialData?: State;
@@ -465,7 +478,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
             if ("tools" in (node.state as object)) {
                 return (node.state as { tools: Passives[] }).tools.length > 0;
             }
-            return true;
+            return false;
         }
     };
 
@@ -1059,6 +1072,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
                             addLayer(
                                 createPlane(
                                     `portal-${id}`,
+                                    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                                     tier!,
                                     Math.floor(Math.random() * 4294967296),
                                     influences.map(
@@ -1148,9 +1162,13 @@ export const main = createLayer("main", function (this: BaseLayer) {
                 draggable: true
             },
             influence: {
-                shape: Shape.Circle,
+                shape: node =>
+                    (node.state as unknown as InfluenceState).type === "increaseResources" ||
+                    (node.state as unknown as InfluenceState).type === "decreaseResources"
+                        ? Shape.Diamond
+                        : Shape.Circle,
                 size: 50,
-                title: node => (node.state as unknown as InfluenceState).type,
+                title: node => influences[(node.state as unknown as InfluenceState).type].display,
                 label: node => {
                     if (node === board.selectedNode.value) {
                         const state = node.state as unknown as InfluenceState;
