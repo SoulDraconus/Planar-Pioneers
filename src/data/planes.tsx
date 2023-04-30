@@ -2,7 +2,7 @@ import ModalVue from "components/Modal.vue";
 import SpacerVue from "components/layout/Spacer.vue";
 import StickyVue from "components/layout/Sticky.vue";
 import { GenericAchievement, createAchievement } from "features/achievements/achievement";
-import { BoardNode } from "features/boards/board";
+import { BoardNode, getUniqueNodeID } from "features/boards/board";
 import { jsx } from "features/feature";
 import { createRepeatable } from "features/repeatable";
 import { createResource } from "features/resources/resource";
@@ -18,7 +18,7 @@ import {
     createMultiplicativeModifier,
     createSequentialModifier
 } from "game/modifiers";
-import { noPersist, persistent } from "game/persistence";
+import { State, noPersist, persistent } from "game/persistence";
 import { createCostRequirement } from "game/requirements";
 import { adjectives, colors, uniqueNamesGenerator } from "unique-names-generator";
 import Decimal, { DecimalSource } from "util/bignum";
@@ -28,7 +28,14 @@ import { Computable, ProcessedComputable, convertComputable } from "util/compute
 import { VueFeature, render, renderRow, trackHover } from "util/vue";
 import { ComputedRef, Ref, computed, ref, unref } from "vue";
 import { createCollapsibleModifierSections, createFormulaPreview, estimateTime } from "./common";
-import { main, mineLootTable, resourceNames } from "./projEntry";
+import {
+    InfluenceState,
+    Influences,
+    influences as influenceTypes,
+    main,
+    mineLootTable,
+    resourceNames
+} from "./projEntry";
 import type { ResourceState, Resources, PortalState } from "./projEntry";
 import { getColor, getName, sfc32 } from "./utils";
 
@@ -39,7 +46,12 @@ export type Treasure = GenericAchievement & {
     resourceMulti: DecimalSource;
 };
 
-export function createPlane(id: string, tier: Resources, seed: number) {
+export function createPlane(
+    id: string,
+    tier: Resources,
+    seed: number,
+    influences: InfluenceState[]
+) {
     return createLayer(id, function (this: BaseLayer) {
         const random = sfc32(0, seed >> 0, seed >> 32, 1);
         for (let i = 0; i < 12; i++) random();
@@ -49,8 +61,21 @@ export function createPlane(id: string, tier: Resources, seed: number) {
         const background = getColor([0.18, 0.2, 0.25], random);
         const resource = createResource<DecimalSource>(0, getName(random));
         const tierIndex = resourceNames.indexOf(tier);
+        let difficultyRand = random();
+        if (influences.some(i => i.type === "increaseDiff")) {
+            difficultyRand = difficultyRand / 2 + 0.5;
+        }
+        if (influences.some(i => i.type === "decreaseDiff")) {
+            difficultyRand = difficultyRand / 2;
+        }
         const difficulty = random() + tierIndex + 1;
-        const length = Math.ceil(random() * (tierIndex + 2));
+        const rewardsLevel = influences.some(i => i.type === "increaseRewards")
+            ? difficulty + 1
+            : difficulty;
+        let length = Math.ceil(random() * (tierIndex + 2));
+        if (influences.some(i => i.type === "increaseLength")) {
+            length++;
+        }
 
         const resourceModifiers: WithRequired<Modifier, "description" | "invert">[] = [];
         const resourceGainModifier = createSequentialModifier(() => resourceModifiers);
@@ -62,21 +87,30 @@ export function createPlane(id: string, tier: Resources, seed: number) {
             cost: FormulaSource;
         }[] = [];
 
-        function prepareFeature(
-            feature: VueFeature,
-            canClick: Computable<boolean>,
-            modifier: WithRequired<Modifier, "description" | "invert">,
-            cost: FormulaSource,
-            previewModifier: WithRequired<Modifier, "invert"> = modifier
-        ) {
+        function prepareFeature({
+            feature,
+            canClick,
+            modifier,
+            cost,
+            previewModifier,
+            showETA
+        }: {
+            feature: VueFeature;
+            canClick: Computable<boolean>;
+            modifier: WithRequired<Modifier, "description" | "invert">;
+            cost: FormulaSource;
+            previewModifier?: WithRequired<Modifier, "invert">;
+            showETA?: Computable<boolean | undefined>;
+        }) {
             canClick = convertComputable(canClick);
+            showETA = convertComputable(showETA);
 
             const isHovering = trackHover(feature);
             previews.push({
                 shouldShowPreview: computed(
                     () => unref(canClick as ProcessedComputable<boolean>) && isHovering.value
                 ),
-                modifier: previewModifier,
+                modifier: previewModifier ?? modifier,
                 cost
             });
             resourceModifiers.push(modifier);
@@ -84,7 +118,10 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                 unrefFormulaSource(cost)
             );
             addTooltip(feature, {
-                display: eta,
+                display:
+                    showETA == null
+                        ? eta
+                        : () => (unref(showETA as ProcessedComputable<boolean>) ? eta.value : ""),
                 direction: Direction.Down
             });
         }
@@ -101,10 +138,15 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                 .times(10)
                 .times(costFormula.evaluate())
         );
+        const influenceTreasures: Influences[] = [];
         for (let i = 0; i < length; i++) {
             const featureWeights = {
-                upgrades: 16,
-                repeatables: i <= 1 ? 0 : 8
+                upgrades: 32,
+                repeatables: i <= 1 ? 0 : 16
+                // conversion: i <= 3 ? 0 : 8,
+                // xp: i <= 5 ? 0 : 4,
+                // dimensions: i <= 7 ? 0 : 2,
+                // prestige: i <= 7 && i < length - 1 ? 0 : 1
             };
             const type = pickRandom(featureWeights, random);
             switch (type) {
@@ -177,12 +219,13 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                             },
                             visibility: upgradeVisibility
                         }));
-                        prepareFeature(
-                            upgrade,
-                            () => !upgrade.bought.value && upgrade.canPurchase.value,
+                        prepareFeature({
+                            feature: upgrade,
+                            canClick: () => upgrade.canPurchase.value,
                             modifier,
-                            cost
-                        );
+                            cost,
+                            showETA: () => !upgrade.bought.value
+                        });
                         upgrades.push(upgrade);
                     }
                     features.push(upgrades);
@@ -193,6 +236,7 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                         const repeatableTypeWeights = {
                             add: 1.5,
                             mult: 3
+                            // pow was too hard to implement such that the cost would be invertible
                         };
                         const upgradeType = pickRandom(repeatableTypeWeights, random);
                         // Repeatables will estimate 5 purchases between each increment of `n`
@@ -279,23 +323,30 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                             }),
                             visibility: repeatableVisibility
                         }));
-                        prepareFeature(
-                            repeatable,
-                            () => unref(repeatable.canClick),
+                        prepareFeature({
+                            feature: repeatable,
+                            canClick: () => unref(repeatable.canClick),
                             modifier,
                             cost,
                             previewModifier
-                        );
+                        });
                         repeatables.push(repeatable);
                     }
                     features.push(repeatables);
                     break;
             }
             const treasureWeights = {
-                cache: 100,
-                generation: 10,
-                resourceMulti: 5,
-                energyMulti: 5
+                cache: influences.some(i => i.type === "increaseCaches") ? 10 : 1,
+                generation: influences.some(i => i.type === "increaseGens") ? 10 : 1,
+                resourceMulti: influences.some(i => i.type === "increaseResourceMults") ? 10 : 1,
+                energyMulti: influences.some(i => i.type === "increaseEnergyMults") ? 2.5 : 0.25,
+                influences:
+                    Object.keys(main.influenceNodes.value).length + influenceTreasures.length ===
+                    Object.keys(influenceTypes).length
+                        ? 0
+                        : influences.some(i => i.type === "increaseInfluences")
+                        ? 20
+                        : 2
             };
             const treasureType = pickRandom(treasureWeights, random);
             let description = "";
@@ -307,8 +358,8 @@ export function createPlane(id: string, tier: Resources, seed: number) {
             let resourceMulti: DecimalSource;
             switch (treasureType) {
                 case "cache":
-                    randomResource = getRandomResource(random);
-                    description = `Gain ${format(difficulty)}x your current ${randomResource}.`;
+                    randomResource = getRandomResource(random, influences);
+                    description = `Gain ${format(rewardsLevel)}x your current ${randomResource}.`;
                     onComplete = () =>
                         main.grantResource(
                             randomResource,
@@ -317,28 +368,60 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                                     main.resourceNodes.value[randomResource]
                                         ?.state as unknown as ResourceState | null
                                 )?.amount ?? 0,
-                                difficulty
+                                rewardsLevel
                             )
                         );
                     break;
                 case "generation":
-                    randomResource = getRandomResource(random);
-                    const gain = Decimal.div(difficulty, 120).times(mineLootTable[randomResource]);
+                    randomResource = getRandomResource(random, influences);
+                    const gain = Decimal.div(rewardsLevel, 120).times(
+                        mineLootTable[randomResource]
+                    );
                     description = `Gain ${format(gain)} ${randomResource}/s while plane is active.`;
                     update = diff => main.grantResource(randomResource, Decimal.times(diff, gain));
                     link = computed(() => main.resourceNodes.value[randomResource]);
                     break;
                 case "resourceMulti":
-                    effectedResource = randomResource = getRandomResource(random);
-                    resourceMulti = Decimal.div(difficulty, 17).pow_base(2);
+                    effectedResource = randomResource = getRandomResource(random, influences);
+                    resourceMulti = Decimal.div(rewardsLevel, 17).pow_base(2);
                     description = `Gain ${format(
                         resourceMulti
                     )}x ${randomResource} while plane is active.`;
                     break;
                 case "energyMulti":
                     effectedResource = "energy";
-                    resourceMulti = Decimal.div(difficulty, 17);
+                    resourceMulti = Decimal.div(rewardsLevel, 17);
                     description = `Gain ${format(resourceMulti)}x energy while plane is active.`;
+                    break;
+                case "influences":
+                    const randomInfluence = pickRandom(
+                        (Object.keys(influenceTypes) as Influences[]).reduce((acc, curr) => {
+                            acc[curr] =
+                                curr in main.influenceNodes.value ||
+                                influenceTreasures.includes(curr)
+                                    ? 0
+                                    : 1;
+                            return acc;
+                        }, {} as Record<Influences, number>),
+                        random
+                    );
+                    influenceTreasures.push(randomInfluence);
+                    description = `Gain a new portal influence`;
+                    onComplete = () =>
+                        main.board.placeInAvailableSpace({
+                            id: getUniqueNodeID(main.board),
+                            position: {
+                                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                                ...main.board.types.portal.nodes.value.find(
+                                    n => (n.state as unknown as PortalState).id === id
+                                )!.position
+                            },
+                            type: "influence",
+                            state: {
+                                type: randomInfluence,
+                                data: influenceTypes[randomInfluence].initialData
+                            }
+                        });
                     break;
             }
             const milestoneVisibility = visibility;
@@ -510,6 +593,7 @@ export function createPlane(id: string, tier: Resources, seed: number) {
         return {
             tier: persistent(tier),
             seed: persistent(seed),
+            influences: persistent(influences as unknown as State[]),
             name,
             color,
             resource,
@@ -539,7 +623,7 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                                 style="display: inline"
                                 onClick={() => (showModifiersModal.value = true)}
                             >
-                                open modifiers
+                                modifiers
                             </button>
                         </span>
                     </StickyVue>
@@ -578,8 +662,23 @@ export function createPlane(id: string, tier: Resources, seed: number) {
 }
 
 // Using separate method from what's used in mining, because planes are influenced by influences and not things like dowsing
-function getRandomResource(random: () => number) {
-    const sumResourceWeights = (Object.values(mineLootTable) as number[]).reduce((a, b) => a + b);
+function getRandomResource(random: () => number, influences: InfluenceState[]) {
+    influences = influences.filter(
+        i => i.type === "increaseResources" || i.type === "decreaseResources"
+    );
+    const sumResourceWeights = (Object.keys(mineLootTable) as Resources[]).reduce((a, b) => {
+        let weight = mineLootTable[b];
+        influences
+            .filter(i => i.data === b)
+            .forEach(influence => {
+                if (influence.type === "increaseResources") {
+                    weight *= 1000;
+                } else {
+                    weight /= 1000;
+                }
+            });
+        return a + weight;
+    }, 0);
     const resourceWeightsKeys = Object.keys(mineLootTable) as Resources[];
     const r = Math.floor(random() * sumResourceWeights);
     let weight = 0;

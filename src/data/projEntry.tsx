@@ -66,12 +66,17 @@ export interface EmpowererState {
 
 export interface PortalGeneratorState {
     tier: Resources | undefined;
-    influences: string[];
+    influences: Influences[];
 }
 
 export interface PortalState {
     id: string;
     powered: boolean;
+}
+
+export interface InfluenceState {
+    type: Influences;
+    data: State;
 }
 
 export const mineLootTable = {
@@ -216,6 +221,95 @@ const passives = {
 
 export type Passives = keyof typeof passives;
 
+export const influences = {
+    increaseResources: {
+        description: (state: InfluenceState) => {
+            const resources = state.data as Resources[];
+            if (resources.length === 0) {
+                return "Increase resource odds - Drag a resource to me!";
+            }
+            if (resources.length === 1) {
+                return `Increase ${resources[0]}'s odds`;
+            }
+            return `Increase ${resources.length} resources' odds`;
+        },
+        cost: 2,
+        initialData: []
+    },
+    decreaseResources: {
+        description: (state: InfluenceState) => {
+            const resources = state.data as Resources[];
+            if (resources.length === 0) {
+                return "Decrease resource odds - Drag a resource to me!";
+            }
+            if (resources.length === 1) {
+                return `Decrease ${resources[0]}'s odds`;
+            }
+            return `Decrease ${resources.length} resources' odds`;
+        },
+        cost: 2,
+        initialData: []
+    },
+    increaseLength: {
+        description: "Increase length",
+        cost: 100,
+        initialData: undefined
+    },
+    increaseCaches: {
+        description: "Increase caches odds",
+        cost: 10,
+        initialData: undefined
+    },
+    increaseGens: {
+        description: "Increase generators odds",
+        cost: 10,
+        initialData: undefined
+    },
+    increaseInfluences: {
+        description: "Increase influences odds",
+        cost: 10,
+        initialData: undefined
+    },
+    increaseEnergyMults: {
+        description: "Increase energy mults odds",
+        cost: 10,
+        initialData: undefined
+    },
+    increaseResourceMults: {
+        description: "Increase resource mults odds",
+        cost: 10,
+        initialData: undefined
+    },
+    increaseDiff: {
+        description: "Increase difficulty/rewards odds",
+        cost: 10,
+        initialData: undefined
+    },
+    decreaseDiff: {
+        description: "Decrease difficulty/rewards odds",
+        cost: 10,
+        initialData: undefined
+    },
+    increaseRewards: {
+        description: "Increase rewards level",
+        cost: 1e4,
+        initialData: undefined
+    }
+    // relic: {
+    //     description: "Max length/difficulty, add tier-unique relic",
+    //     cost: 1e6,
+    //     initialData: undefined
+    // }
+} as const satisfies Record<
+    string,
+    {
+        description: string | ((state: InfluenceState) => string);
+        cost: DecimalSource;
+        initialData?: State;
+    }
+>;
+export type Influences = keyof typeof influences;
+
 /**
  * @hidden
  */
@@ -240,6 +334,13 @@ export const main = createLayer("main", function (this: BaseLayer) {
         wood: board.types.quarry.nodes.value[0],
         coal: board.types.empowerer.nodes.value[0],
         iron: board.types.portalGenerator.nodes.value[0]
+    }));
+
+    const influenceNodes: ComputedRef<Record<Influences, BoardNode>> = computed(() => ({
+        ...board.types.influence.nodes.value.reduce((acc, curr) => {
+            acc[(curr.state as unknown as InfluenceState).type] = curr;
+            return acc;
+        }, {} as Record<Influences, BoardNode>)
     }));
 
     const resourceLevels = computed(() =>
@@ -336,11 +437,12 @@ export const main = createLayer("main", function (this: BaseLayer) {
         id: "deselect",
         icon: "close",
         tooltip: (node: BoardNode) => ({
-            text:
-                "resources" in (node.state as object) ? "Disconnect resources" : "Disconnect tools"
+            text: "tools" in (node.state as object) ? "Disconnect tools" : "Disconnect resources"
         }),
         onClick(node: BoardNode) {
-            if ("resources" in (node.state as object)) {
+            if (Array.isArray(node.state)) {
+                node.state = [];
+            } else if ("resources" in (node.state as object)) {
                 node.state = { ...(node.state as object), resources: [] };
             } else if ("tools" in (node.state as object)) {
                 node.state = { ...(node.state as object), tools: [] };
@@ -349,6 +451,9 @@ export const main = createLayer("main", function (this: BaseLayer) {
             board.selectedNode.value = null;
         },
         visibility: (node: BoardNode) => {
+            if (Array.isArray(node.state)) {
+                return node.state.length > 0;
+            }
             if ("resources" in (node.state as object)) {
                 return (node.state as { resources: Resources[] }).resources.length > 0;
             }
@@ -886,11 +991,9 @@ export const main = createLayer("main", function (this: BaseLayer) {
                                       }-tier portal`
                         };
                     }
-                    if ((board as GenericBoard).draggingNode.value?.type === "resource") {
-                        const resource = (
-                            (board as GenericBoard).draggingNode.value
-                                ?.state as unknown as ResourceState
-                        ).type;
+                    const draggingNode = (board as GenericBoard).draggingNode.value;
+                    if (draggingNode?.type === "resource") {
+                        const resource = (draggingNode.state as unknown as ResourceState).type;
                         const text =
                             (node.state as unknown as PortalGeneratorState).tier === resource
                                 ? "Disconnect"
@@ -899,8 +1002,17 @@ export const main = createLayer("main", function (this: BaseLayer) {
                             text,
                             color: "var(--accent2)"
                         };
+                    } else if (draggingNode?.type === "influence") {
+                        const influence = (draggingNode.state as unknown as InfluenceState).type;
+                        const { influences } = node.state as unknown as PortalGeneratorState;
+                        if (influences.includes(influence)) {
+                            return { text: "Disconnect", color: "var(--accent2)" };
+                        }
+                        return {
+                            text: "Add influence",
+                            color: "var(--accent2)"
+                        };
                     }
-                    // TODO handle influences
                     return null;
                 },
                 actionDistance: Math.PI / 4,
@@ -937,12 +1049,18 @@ export const main = createLayer("main", function (this: BaseLayer) {
                             while (`portal-${id}` in layers) {
                                 id++;
                             }
+                            const { tier, influences } =
+                                node.state as unknown as PortalGeneratorState;
                             addLayer(
                                 createPlane(
                                     `portal-${id}`,
-                                    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                                    (node.state as unknown as PortalGeneratorState).tier!,
-                                    Math.floor(Math.random() * 4294967296)
+                                    tier!,
+                                    Math.floor(Math.random() * 4294967296),
+                                    influences.map(
+                                        influence =>
+                                            influenceNodes.value[influence]
+                                                .state as unknown as InfluenceState
+                                    )
                                 ),
                                 player
                             );
@@ -974,7 +1092,8 @@ export const main = createLayer("main", function (this: BaseLayer) {
                             tier: droppedType === currentType ? undefined : droppedType
                         };
                     } else if (otherNode.type === "influence") {
-                        const droppedInfluence = otherNode.state as string;
+                        const droppedInfluence = (otherNode.state as unknown as InfluenceState)
+                            .type;
                         const currentInfluences = (node.state as unknown as PortalGeneratorState)
                             .influences;
                         if (currentInfluences.includes(droppedInfluence)) {
@@ -1021,6 +1140,42 @@ export const main = createLayer("main", function (this: BaseLayer) {
                 }),
                 outlineColor: node =>
                     (layers[(node.state as unknown as PortalState).id] as GenericPlane).background,
+                draggable: true
+            },
+            influence: {
+                shape: Shape.Circle,
+                size: 50,
+                title: node => (node.state as unknown as InfluenceState).type,
+                label: node => {
+                    if (node === board.selectedNode.value) {
+                        const state = node.state as unknown as InfluenceState;
+                        const desc = influences[state.type].description;
+                        return { text: typeof desc === "function" ? desc(state) : desc };
+                    }
+                    return null;
+                },
+                actionDistance: Math.PI / 4,
+                actions: [deselectAllAction],
+                canAccept: (node, otherNode) => {
+                    if (otherNode.type !== "resource") {
+                        return false;
+                    }
+                    return Array.isArray(node.state);
+                },
+                onDrop: (node, otherNode) => {
+                    if (otherNode.type !== "resource") {
+                        return;
+                    }
+                    const resource = (otherNode.state as unknown as ResourceState).type;
+                    const resources = node.state as Resources[];
+                    if (resources.includes(resource)) {
+                        node.state = resources.filter(r => r !== resource);
+                    } else {
+                        node.state = [...resources, resource];
+                    }
+                    board.selectedNode.value = node;
+                },
+                outlineColor: "var(--danger)",
                 draggable: true
             }
         },
@@ -1098,21 +1253,25 @@ export const main = createLayer("main", function (this: BaseLayer) {
                 });
             }
             if (portalGenerator.value != null) {
-                if ((portalGenerator.value.state as unknown as PortalGeneratorState).tier != null) {
+                const state = portalGenerator.value.state as unknown as PortalGeneratorState;
+                if (state.tier != null) {
                     links.push({
-                        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                        startNode: portalGenerator.value!,
-                        endNode:
-                            resourceNodes.value[
-                                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                                (portalGenerator.value.state as unknown as PortalGeneratorState)
-                                    .tier!
-                            ],
+                        startNode: portalGenerator.value,
+                        endNode: resourceNodes.value[state.tier],
                         stroke: "var(--foreground)",
                         strokeWidth: 4
                     });
-                    // TODO link to influences
                 }
+                state.influences.forEach(influence => {
+                    console.log(influence);
+                    links.push({
+                        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                        startNode: portalGenerator.value!,
+                        endNode: influenceNodes.value[influence],
+                        stroke: "var(--foreground)",
+                        strokeWidth: 4
+                    });
+                });
                 (board as GenericBoard).types.portal.nodes.value.forEach(node => {
                     const plane = layers[(node.state as unknown as PortalState).id] as GenericPlane;
                     plane.links.value.forEach(n => {
@@ -1142,6 +1301,19 @@ export const main = createLayer("main", function (this: BaseLayer) {
                     return links;
                 });
             }
+            Object.values(influenceNodes.value).forEach(node => {
+                const state = node.state as unknown as InfluenceState;
+                if (state.type === "increaseResources" || state.type === "decreaseResources") {
+                    (state.data as Resources[]).forEach(resource => {
+                        links.push({
+                            startNode: node,
+                            endNode: resourceNodes.value[resource],
+                            stroke: "var(--foreground)",
+                            strokeWidth: 4
+                        });
+                    });
+                }
+            });
             return links;
         }
     }));
@@ -1597,6 +1769,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
         passives,
         resourceNodes,
         toolNodes,
+        influenceNodes,
         grantResource,
         activePortals,
         display: jsx(() => (
@@ -1630,7 +1803,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
                             style="display: inline"
                             onClick={() => (showModifiersModal.value = true)}
                         >
-                            open modifiers
+                            modifiers
                         </button>
                     </span>
                     {player.devSpeed === 0 ? (
@@ -1662,7 +1835,8 @@ export const getInitialLayers = (
             createPlane(
                 `portal-${id}`,
                 layer.tier ?? "dirt",
-                layer.seed ?? Math.floor(Math.random() * 4294967296)
+                layer.seed ?? Math.floor(Math.random() * 4294967296),
+                (layer.influences ?? []) as unknown as InfluenceState[]
             )
         );
         id++;
