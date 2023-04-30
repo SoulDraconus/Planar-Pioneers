@@ -38,6 +38,9 @@ import {
 } from "./projEntry";
 import type { ResourceState, Resources, PortalState } from "./projEntry";
 import { getColor, getName, sfc32 } from "./utils";
+import { useToast } from "vue-toastification";
+
+const toast = useToast();
 
 export type Treasure = GenericAchievement & {
     update?: (diff: number) => void;
@@ -68,7 +71,7 @@ export function createPlane(
         if (influences.some(i => i.type === "decreaseDiff")) {
             difficultyRand = difficultyRand / 2;
         }
-        const difficulty = random() + tierIndex + 1;
+        const difficulty = difficultyRand + tierIndex + 1;
         const rewardsLevel = influences.some(i => i.type === "increaseRewards")
             ? difficulty + 1
             : difficulty;
@@ -408,6 +411,14 @@ export function createPlane(
                     influenceTreasures.push(randomInfluence);
                     description = `Gain a new portal influence`;
                     onComplete = () => {
+                        if (randomInfluence in main.influenceNodes.value) {
+                            toast.warning(
+                                "Error: ignoring duplicate portal influence (" +
+                                    influenceTypes[randomInfluence].display +
+                                    ")"
+                            );
+                            return;
+                        }
                         const node = {
                             id: getUniqueNodeID(main.board),
                             position: {
