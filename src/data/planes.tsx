@@ -1,13 +1,20 @@
+import ModalVue from "components/Modal.vue";
 import SpacerVue from "components/layout/Spacer.vue";
 import StickyVue from "components/layout/Sticky.vue";
+import { GenericAchievement, createAchievement } from "features/achievements/achievement";
+import { BoardNode } from "features/boards/board";
 import { jsx } from "features/feature";
+import { createRepeatable } from "features/repeatable";
 import { createResource } from "features/resources/resource";
+import { addTooltip } from "features/tooltips/tooltip";
 import { createUpgrade } from "features/upgrades/upgrade";
-import Formula from "game/formulas/formulas";
+import Formula, { unrefFormulaSource } from "game/formulas/formulas";
+import { FormulaSource, GenericFormula } from "game/formulas/types";
 import { BaseLayer, createLayer } from "game/layers";
 import {
     Modifier,
     createAdditiveModifier,
+    createExponentialModifier,
     createMultiplicativeModifier,
     createSequentialModifier
 } from "game/modifiers";
@@ -17,17 +24,13 @@ import { adjectives, colors, uniqueNamesGenerator } from "unique-names-generator
 import Decimal, { DecimalSource } from "util/bignum";
 import { format } from "util/break_eternity";
 import { Direction, WithRequired, camelToTitle } from "util/common";
+import { Computable, ProcessedComputable, convertComputable } from "util/computed";
 import { VueFeature, render, renderRow, trackHover } from "util/vue";
 import { ComputedRef, Ref, computed, ref, unref } from "vue";
 import { createCollapsibleModifierSections, createFormulaPreview, estimateTime } from "./common";
-import { main, Resources, resourceNames, mineLootTable, ResourceState } from "./projEntry";
+import { main, mineLootTable, resourceNames } from "./projEntry";
+import type { ResourceState, Resources, PortalState } from "./projEntry";
 import { getColor, getName, sfc32 } from "./utils";
-import ModalVue from "components/Modal.vue";
-import { addTooltip } from "features/tooltips/tooltip";
-import { GenericAchievement, createAchievement } from "features/achievements/achievement";
-import { Computable, ProcessedComputable } from "util/computed";
-import { BoardNode } from "features/boards/board";
-import { createExponentialModifier } from "game/modifiers";
 
 export type Treasure = GenericAchievement & {
     update?: (diff: number) => void;
@@ -56,35 +59,54 @@ export function createPlane(id: string, tier: Resources, seed: number) {
         const previews: {
             shouldShowPreview: Ref<boolean>;
             modifier: Modifier;
-            cost: DecimalSource;
+            cost: FormulaSource;
         }[] = [];
 
+        function prepareFeature(
+            feature: VueFeature,
+            canClick: Computable<boolean>,
+            modifier: WithRequired<Modifier, "description" | "invert">,
+            cost: FormulaSource,
+            previewModifier: WithRequired<Modifier, "invert"> = modifier
+        ) {
+            canClick = convertComputable(canClick);
+
+            const isHovering = trackHover(feature);
+            previews.push({
+                shouldShowPreview: computed(
+                    () => unref(canClick as ProcessedComputable<boolean>) && isHovering.value
+                ),
+                modifier: previewModifier,
+                cost
+            });
+            resourceModifiers.push(modifier);
+            const eta = estimateTime(resource, computedResourceGain, () =>
+                unrefFormulaSource(cost)
+            );
+            addTooltip(feature, {
+                display: eta,
+                direction: Direction.Down
+            });
+        }
+
         const features: VueFeature[][] = [];
-        const t = ref<DecimalSource>(0);
-        let costFormula = Formula.variable(t);
+        const n = ref(0);
+        // Makes cost formula value reactive on n, so nextCost will update as appropriate
+        let costFormula = Formula.variable(n).times(0);
+        const cachedGain: Record<number, DecimalSource> = {};
         let visibility: Computable<boolean> = true;
+        const nextCost = computed(() =>
+            Decimal.add(difficulty, random() - 0.5)
+                .pow_base(2)
+                .times(10)
+                .times(costFormula.evaluate())
+        );
         for (let i = 0; i < length; i++) {
             const featureWeights = {
-                upgrades: 16
+                upgrades: 16,
+                repeatables: i <= 1 ? 0 : 8
             };
-            const sumFeatureWeights = Object.values(featureWeights).reduce((a, b) => a + b);
-            const featureWeightsKeys = Object.keys(
-                featureWeights
-            ) as (keyof typeof featureWeights)[];
-            let r = Math.floor(random() * sumFeatureWeights);
-            let weight = 0;
-            let type: keyof typeof featureWeights | null = null;
-            for (let i = 0; i < featureWeightsKeys.length; i++) {
-                const feature = featureWeightsKeys[i];
-                weight += featureWeights[feature];
-                if (r < weight) {
-                    type = feature;
-                    break;
-                }
-            }
-            if (type == null) {
-                continue; // Should not happen
-            }
+            const type = pickRandom(featureWeights, random);
             switch (type) {
                 case "upgrades":
                     const upgrades: VueFeature[] = [];
@@ -94,44 +116,16 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                             mult: i === 0 && j === 0 ? 0 : 1,
                             pow: i === 0 ? 0 : 0.5
                         };
-                        const sumUpgradeTypeWeights = Object.values(upgradeTypeWeights).reduce(
-                            (a, b) => a + b
-                        );
-                        const upgradeTypeWeightsKeys = Object.keys(
-                            upgradeTypeWeights
-                        ) as (keyof typeof upgradeTypeWeights)[];
-                        let weight = 0;
-                        let upgradeType: keyof typeof upgradeTypeWeights | null = null;
-                        r = random() * sumUpgradeTypeWeights;
-                        for (let i = 0; i < upgradeTypeWeightsKeys.length; i++) {
-                            const type = upgradeTypeWeightsKeys[i];
-                            weight += upgradeTypeWeights[type];
-                            if (r < weight) {
-                                upgradeType = type;
-                                break;
-                            }
-                        }
-                        if (upgradeType == null) {
-                            continue;
-                        }
-                        const cost = Decimal.times(difficulty, random() + 0.5)
-                            .pow_base(2)
-                            .times(10)
-                            .times(costFormula.evaluate());
-                        const title = camelToTitle(
-                            uniqueNamesGenerator({
-                                dictionaries: [colors, adjectives],
-                                seed: random() * 4294967296,
-                                separator: " "
-                            }) + "ity"
-                        );
+                        const upgradeType = pickRandom(upgradeTypeWeights, random);
+                        const cost = nextCost.value;
+                        const title = getRandomUpgrade(random);
                         let description = "";
                         let modifier: WithRequired<Modifier, "description" | "invert">;
                         switch (upgradeType) {
                             case "add": {
                                 const addend = Decimal.add(cost, 10).pow(random() / 4 + 0.875);
                                 description = `Gain ${format(addend)} ${resource.displayName}/s`;
-                                costFormula = costFormula.step(t.value, c => c.add(addend));
+                                costFormula = costFormula.add(addend);
                                 modifier = createAdditiveModifier(() => ({
                                     addend,
                                     description: title,
@@ -141,13 +135,12 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                             }
                             case "mult": {
                                 const multiplier = random() * 5 + 1;
-                                description = `Multiply ${resource.displayName} gain by ${format(
-                                    multiplier
-                                )}.`;
-                                costFormula = costFormula.step(t.value, c => {
-                                    const beforeStep = Decimal.sub(t.value, c.evaluate());
-                                    return c.add(beforeStep).times(multiplier).sub(beforeStep);
-                                });
+                                description = `Multiply previous ${
+                                    resource.displayName
+                                } gain by x${format(multiplier)}.`;
+                                costFormula = costFormula.add(
+                                    Decimal.sub(multiplier, 1).times(cachedGain[n.value - 1])
+                                );
                                 modifier = createMultiplicativeModifier(() => ({
                                     multiplier,
                                     description: title,
@@ -156,14 +149,13 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                                 break;
                             }
                             case "pow": {
-                                const exponent = random() / 5 + 1;
-                                description = `Raise ${resource.displayName} gain to the ^${format(
-                                    exponent
-                                )}`;
-                                costFormula = costFormula.step(t.value, c => {
-                                    const beforeStep = Decimal.sub(t.value, c.evaluate());
-                                    return c.add(beforeStep).pow(exponent).sub(beforeStep);
-                                });
+                                const exponent = random() / 5 + 1.1;
+                                description = `Raise previous ${
+                                    resource.displayName
+                                } gain to the ^${format(exponent)}`;
+                                costFormula = costFormula
+                                    .add(Decimal.pow(cachedGain[n.value - 1], exponent))
+                                    .sub(cachedGain[n.value - 1]);
                                 modifier = createExponentialModifier(() => ({
                                     exponent,
                                     description: title,
@@ -171,9 +163,8 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                                 }));
                             }
                         }
-                        t.value = Decimal.times(difficulty, random() + 0.5)
-                            .pow_base(2)
-                            .add(t.value);
+                        cachedGain[n.value] = costFormula.evaluate();
+                        n.value++;
                         const upgradeVisibility = visibility;
                         const upgrade = createUpgrade(() => ({
                             requirements: createCostRequirement(() => ({
@@ -186,26 +177,118 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                             },
                             visibility: upgradeVisibility
                         }));
-                        const isHovering = trackHover(upgrade);
-                        previews.push({
-                            shouldShowPreview: computed(
-                                () =>
-                                    !upgrade.bought.value &&
-                                    upgrade.canPurchase.value &&
-                                    isHovering.value
-                            ),
+                        prepareFeature(
+                            upgrade,
+                            () => !upgrade.bought.value && upgrade.canPurchase.value,
                             modifier,
                             cost
-                        });
-                        resourceModifiers.push(modifier);
-                        const eta = estimateTime(resource, computedResourceGain, cost);
-                        addTooltip(upgrade, {
-                            display: () => (upgrade.bought.value ? "" : eta.value),
-                            direction: Direction.Down
-                        });
+                        );
                         upgrades.push(upgrade);
                     }
                     features.push(upgrades);
+                    break;
+                case "repeatables":
+                    const repeatables: VueFeature[] = [];
+                    for (let j = 0; j < 3; j++) {
+                        const repeatableTypeWeights = {
+                            add: 1.5,
+                            mult: 3
+                        };
+                        const upgradeType = pickRandom(repeatableTypeWeights, random);
+                        // Repeatables will estimate 5 purchases between each increment of `n`
+                        // This will become less accurate the further n gets from when the repeatable showed up, but at that time it should be having an increasingly smaller effect on the overall gain
+                        const currentN = n.value;
+                        const initialCost = nextCost.value;
+                        const title = getRandomUpgrade(random);
+                        let description = "";
+                        let effect: ComputedRef<string>;
+                        let modifier: WithRequired<Modifier, "description" | "invert">;
+                        let previewModifier: WithRequired<Modifier, "invert">;
+                        let cost: GenericFormula;
+                        const costInput = Formula.variable(
+                            computed(() => repeatable.amount.value)
+                        ).times(2);
+                        switch (upgradeType) {
+                            case "add": {
+                                const addend = Decimal.add(initialCost, 10).times(random() + 0.5);
+                                description = `Gain ${format(addend)} ${resource.displayName}/s`;
+                                cost = costInput.add(1).times(initialCost);
+                                costFormula = costFormula.add(
+                                    computed(() =>
+                                        Decimal.sub(n.value, currentN).add(1).times(5).times(addend)
+                                    )
+                                );
+                                effect = computed(
+                                    () =>
+                                        format(Decimal.times(addend, repeatable.amount.value)) +
+                                        "/s"
+                                );
+                                modifier = createAdditiveModifier(() => ({
+                                    addend: () => Decimal.times(addend, repeatable.amount.value),
+                                    description: title,
+                                    enabled: () => Decimal.gt(repeatable.amount.value, 0)
+                                }));
+                                previewModifier = createAdditiveModifier(() => ({ addend }));
+                                break;
+                            }
+                            case "mult": {
+                                const multiplier = random() + 1;
+                                description = `Multiply previous ${
+                                    resource.displayName
+                                } gain by x${format(multiplier)}.`;
+                                cost = costInput.pow_base(multiplier).times(initialCost);
+                                costFormula = costFormula.add(
+                                    computed(() =>
+                                        Decimal.sub(n.value, currentN)
+                                            .add(1)
+                                            .times(5)
+                                            .pow_base(multiplier)
+                                            .sub(1)
+                                            .times(cachedGain[currentN])
+                                    )
+                                );
+                                effect = computed(
+                                    () =>
+                                        "x" +
+                                        format(Decimal.pow(multiplier, repeatable.amount.value))
+                                );
+                                modifier = createMultiplicativeModifier(() => ({
+                                    multiplier: () =>
+                                        Decimal.pow(multiplier, repeatable.amount.value),
+                                    description: title,
+                                    enabled: () => Decimal.gt(repeatable.amount.value, 0)
+                                }));
+                                previewModifier = createMultiplicativeModifier(() => ({
+                                    multiplier
+                                }));
+                                break;
+                            }
+                        }
+                        cachedGain[n.value] = costFormula.evaluate();
+                        n.value++;
+                        const repeatableVisibility = visibility;
+                        const repeatable = createRepeatable(() => ({
+                            requirements: createCostRequirement(() => ({
+                                resource: noPersist(resource),
+                                cost
+                            })),
+                            display: () => ({
+                                title,
+                                description,
+                                effectDisplay: unref(effect)
+                            }),
+                            visibility: repeatableVisibility
+                        }));
+                        prepareFeature(
+                            repeatable,
+                            () => unref(repeatable.canClick),
+                            modifier,
+                            cost,
+                            previewModifier
+                        );
+                        repeatables.push(repeatable);
+                    }
+                    features.push(repeatables);
                     break;
             }
             const treasureWeights = {
@@ -214,24 +297,7 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                 resourceMulti: 5,
                 energyMulti: 5
             };
-            const sumTreasureWeights = Object.values(treasureWeights).reduce((a, b) => a + b);
-            const treasureWeightsKeys = Object.keys(
-                treasureWeights
-            ) as (keyof typeof treasureWeights)[];
-            r = Math.floor(random() * sumTreasureWeights);
-            weight = 0;
-            let treasureType: keyof typeof treasureWeights | null = null;
-            for (let i = 0; i < treasureWeightsKeys.length; i++) {
-                const type = treasureWeightsKeys[i];
-                weight += treasureWeights[type];
-                if (r < weight) {
-                    treasureType = type;
-                    break;
-                }
-            }
-            if (treasureType == null) {
-                continue; // Should not happen
-            }
+            const treasureType = pickRandom(treasureWeights, random);
             let description = "";
             let update: (diff: number) => void;
             let onComplete: VoidFunction;
@@ -275,11 +341,8 @@ export function createPlane(id: string, tier: Resources, seed: number) {
                     description = `Gain ${format(resourceMulti)}x energy while plane is active.`;
                     break;
             }
-            const cost = Decimal.times(difficulty, random() + 0.5)
-                .pow_base(2)
-                .times(10)
-                .times(costFormula.evaluate());
             const milestoneVisibility = visibility;
+            const cost = nextCost.value;
             const milestone = createAchievement(() => ({
                 requirements: createCostRequirement(() => ({
                     resource: noPersist(resource),
@@ -330,6 +393,12 @@ export function createPlane(id: string, tier: Resources, seed: number) {
         ));
 
         this.on("preUpdate", diff => {
+            if (
+                !main.activePortals.value.some(n => (n.state as unknown as PortalState).id === id)
+            ) {
+                return;
+            }
+
             resource.value = Decimal.times(computedResourceGain.value, diff).add(resource.value);
 
             earnedTreasures.value.forEach(treasure => {
@@ -340,7 +409,7 @@ export function createPlane(id: string, tier: Resources, seed: number) {
         const resourceChange = computed(() => {
             const preview = previews.find(p => p.shouldShowPreview.value);
             if (preview) {
-                return Decimal.neg(preview.cost);
+                return Decimal.neg(unrefFormulaSource(preview.cost));
             }
             return 0;
         });
@@ -525,6 +594,36 @@ function getRandomResource(random: () => number) {
     }
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     return resource!;
+}
+
+function pickRandom<T extends string>(items: Record<T, number>, random: () => number) {
+    const sumWeights = (Object.values(items) as number[]).reduce((a, b) => a + b);
+    const keys = Object.keys(items) as T[];
+    let weight = 0;
+    let result: T | null = null;
+    const r = random() * sumWeights;
+    for (let i = 0; i < keys.length; i++) {
+        const type = keys[i];
+        weight += items[type];
+        if (r < weight) {
+            result = type;
+            break;
+        }
+    }
+    if (result == null) {
+        throw new Error("Failed to pick random. This should not happen");
+    }
+    return result;
+}
+
+function getRandomUpgrade(random: () => number) {
+    return camelToTitle(
+        uniqueNamesGenerator({
+            dictionaries: [colors, adjectives],
+            seed: random() * 4294967296,
+            separator: " "
+        }) + "ity"
+    );
 }
 
 export type GenericPlane = ReturnType<typeof createPlane>;
