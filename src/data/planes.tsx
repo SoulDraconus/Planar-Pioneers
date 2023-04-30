@@ -407,8 +407,8 @@ export function createPlane(
                     );
                     influenceTreasures.push(randomInfluence);
                     description = `Gain a new portal influence`;
-                    onComplete = () =>
-                        main.board.placeInAvailableSpace({
+                    onComplete = () => {
+                        const node = {
                             id: getUniqueNodeID(main.board),
                             position: {
                                 // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
@@ -421,7 +421,10 @@ export function createPlane(
                                 type: randomInfluence,
                                 data: influenceTypes[randomInfluence].initialData
                             }
-                        });
+                        };
+                        main.board.placeInAvailableSpace(node);
+                        main.board.nodes.value.push(node);
+                    };
                     break;
             }
             const milestoneVisibility = visibility;
