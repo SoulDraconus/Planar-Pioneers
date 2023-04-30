@@ -412,9 +412,14 @@ export const main = createLayer("main", function (this: BaseLayer) {
     });
 
     const poweredMachines: ComputedRef<number> = computed(() => {
-        return [mine, dowsing, quarry, empowerer].filter(
-            node => (node.value?.state as { powered: boolean })?.powered
-        ).length;
+        return (
+            [mine, dowsing, quarry, empowerer].filter(
+                node => (node.value?.state as { powered: boolean })?.powered
+            ).length +
+            board.types.portal.nodes.value.filter(
+                node => (node.state as { powered: boolean }).powered
+            ).length
+        );
     });
     const nextPowerCost = computed(() =>
         Decimal.eq(poweredMachines.value, 0)
