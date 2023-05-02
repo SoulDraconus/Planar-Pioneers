@@ -458,8 +458,8 @@ export const main = createLayer("main", function (this: BaseLayer) {
             text: "tools" in (node.state as object) ? "Disconnect tools" : "Disconnect resources"
         }),
         onClick(node: BoardNode) {
-            if (Array.isArray(node.state)) {
-                node.state = [];
+            if (Array.isArray((node.state as unknown as InfluenceState)?.data)) {
+                node.state = { ...(node.state as object), data: [] };
             } else if ("resources" in (node.state as object)) {
                 node.state = { ...(node.state as object), resources: [] };
             } else if ("tools" in (node.state as object)) {
@@ -469,8 +469,8 @@ export const main = createLayer("main", function (this: BaseLayer) {
             board.selectedNode.value = null;
         },
         visibility: (node: BoardNode) => {
-            if (Array.isArray(node.state)) {
-                return node.state.length > 0;
+            if (Array.isArray((node.state as unknown as InfluenceState)?.data)) {
+                return ((node.state as unknown as InfluenceState).data as string[]).length > 0;
             }
             if ("resources" in (node.state as object)) {
                 return (node.state as { resources: Resources[] }).resources.length > 0;
@@ -1175,6 +1175,25 @@ export const main = createLayer("main", function (this: BaseLayer) {
                         const desc = influences[state.type].description;
                         return { text: typeof desc === "function" ? desc(state) : desc };
                     }
+                    const draggingNode = (board as GenericBoard).draggingNode.value;
+                    if (draggingNode?.type === "resource") {
+                        const resource = (draggingNode.state as unknown as ResourceState).type;
+                        const { type, data } = node.state as unknown as InfluenceState;
+                        let text;
+                        if (Array.isArray(data) && data.includes(resource)) {
+                            text = "Disconnect";
+                        } else if (type === "increaseResources") {
+                            text = `Increase ${camelToTitle(resource)} odds`;
+                        } else if (type === "decreaseResources") {
+                            text = `Decrease ${camelToTitle(resource)} odds`;
+                        } else {
+                            return null;
+                        }
+                        return {
+                            text,
+                            color: "var(--accent2)"
+                        };
+                    }
                     return null;
                 },
                 actionDistance: Math.PI / 4,
@@ -1183,18 +1202,26 @@ export const main = createLayer("main", function (this: BaseLayer) {
                     if (otherNode.type !== "resource") {
                         return false;
                     }
-                    return Array.isArray(node.state);
+                    return Array.isArray((node.state as unknown as InfluenceState).data);
                 },
                 onDrop: (node, otherNode) => {
                     if (otherNode.type !== "resource") {
                         return;
                     }
                     const resource = (otherNode.state as unknown as ResourceState).type;
-                    const resources = node.state as Resources[];
+                    const resources = (node.state as unknown as InfluenceState).data as
+                        | Resources[]
+                        | undefined;
+                    if (resources == null) {
+                        return;
+                    }
                     if (resources.includes(resource)) {
-                        node.state = resources.filter(r => r !== resource);
+                        node.state = {
+                            ...(node.state as object),
+                            data: resources.filter(r => r !== resource)
+                        };
                     } else {
-                        node.state = [...resources, resource];
+                        node.state = { ...(node.state as object), data: [...resources, resource] };
                     }
                     board.selectedNode.value = node;
                 },
@@ -1286,7 +1313,6 @@ export const main = createLayer("main", function (this: BaseLayer) {
                     });
                 }
                 state.influences.forEach(influence => {
-                    console.log(influence);
                     links.push({
                         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                         startNode: portalGenerator.value!,
