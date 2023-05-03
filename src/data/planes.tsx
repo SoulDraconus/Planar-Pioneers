@@ -34,6 +34,7 @@ import {
     influences as influenceTypes,
     main,
     mineLootTable,
+    relics,
     resourceNames
 } from "./projEntry";
 import type { ResourceState, Resources, PortalState } from "./projEntry";
@@ -72,11 +73,16 @@ export function createPlane(
         if (influences.some(i => i.type === "decreaseDiff")) {
             difficultyRand = difficultyRand / 2;
         }
+        if (influences.some(i => i.type === "relic")) {
+            difficultyRand = 1;
+        }
         const difficulty = difficultyRand + tierIndex + 1;
         const rewardsLevel = influences.some(i => i.type === "increaseRewards")
             ? difficulty + 1
             : difficulty;
-        let length = Math.ceil(random() * (tierIndex + 2));
+        let length = influences.some(i => i.type === "relic")
+            ? tierIndex + 2
+            : Math.ceil(random() * (tierIndex + 2));
         if (influences.some(i => i.type === "increaseLength")) {
             length++;
         }
@@ -350,9 +356,13 @@ export function createPlane(
                         ? 0
                         : influences.some(i => i.type === "increaseInfluences")
                         ? 20
-                        : 2
+                        : 2,
+                relic: 0
             };
-            const treasureType = pickRandom(treasureWeights, random);
+            let treasureType = pickRandom(treasureWeights, random);
+            if (i === length - 1 && influences.some(i => i.type === "relic")) {
+                treasureType = "relic";
+            }
             let description = "";
             let update: (diff: number) => void;
             let onComplete: VoidFunction;
@@ -414,9 +424,7 @@ export function createPlane(
                     onComplete = () => {
                         if (randomInfluence in main.influenceNodes.value) {
                             toast.warning(
-                                "Error: ignoring duplicate portal influence (" +
-                                    influenceTypes[randomInfluence].display +
-                                    ")"
+                                `Error: ignoring duplicate portal influence (${influenceTypes[randomInfluence].display})`
                             );
                             return;
                         }
@@ -438,6 +446,27 @@ export function createPlane(
                         main.board.nodes.value.push(node);
                     };
                     break;
+                case "relic":
+                    description = `Gain the ${tier}-tier planar relic (${relics[tier]})`;
+                    onComplete = () => {
+                        if (!(`${tier}Relic` in main.toolNodes.value)) {
+                            const node = {
+                                id: getUniqueNodeID(main.board),
+                                position: {
+                                    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                                    ...main.board.types.portal.nodes.value.find(
+                                        n => (n.state as unknown as PortalState).id === id
+                                    )!.position
+                                },
+                                type: "passive",
+                                state: `${tier}Relic`
+                            };
+                            main.board.placeInAvailableSpace(node);
+                            main.board.nodes.value.push(node);
+                        } else {
+                            toast.warning(`Error: ignoring duplicate relic (${relics[tier]})`);
+                        }
+                    };
             }
             const milestoneVisibility = visibility;
             const cost = nextCost.value;

@@ -207,7 +207,7 @@ const tools = {
     }
 >;
 
-const relics = {
+export const relics = {
     dirt: "Replicator",
     sand: "Metal Detector",
     gravel: "Neural Networks",
@@ -425,13 +425,13 @@ export const influences = {
         description: "Increase rewards level",
         cost: 1e4,
         initialData: undefined
+    },
+    relic: {
+        display: "+relic",
+        description: "Max length/difficulty, add tier-unique relic",
+        cost: 1e6,
+        initialData: undefined
     }
-    // relic: {
-    //     display: "+relic",
-    //     description: "Max length/difficulty, add tier-unique relic",
-    //     cost: 1e6,
-    //     initialData: undefined
-    // }
 } as const satisfies Record<
     string,
     {
