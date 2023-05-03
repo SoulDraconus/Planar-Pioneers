@@ -148,49 +148,56 @@ const tools = {
         cost: 1e10,
         name: "Portal Generator",
         type: "portalGenerator",
-        state: { tier: null, influences: [] }
+        state: { tier: undefined, influences: [] }
     },
     silver: {
         cost: 1e12,
-        name: "Unknown Item",
-        type: "unknownType"
+        name: "Robotics",
+        type: "passive",
+        state: "silver"
     },
     gold: {
         cost: 1e15,
-        name: "Unknown Item",
-        type: "unknownType"
+        name: "Booster",
+        type: "booster",
+        state: { planes: [], maxConnections: 1, powered: false }
     },
     emerald: {
         cost: 1e19,
-        name: "Unknown Item",
-        type: "unknownType"
+        name: "Artificial Intelligence",
+        type: "passive",
+        state: "emerald"
     },
     platinum: {
         cost: 1e24,
-        name: "Unknown Item",
-        type: "unknownType"
+        name: "Upgrader",
+        type: "upgrader",
+        state: { planes: [], maxConnections: 1, powered: false }
     },
     diamond: {
         cost: 1e30,
-        name: "Unknown Item",
-        type: "unknownType"
+        name: "Machine Learning",
+        type: "passive",
+        state: "diamond"
     },
     berylium: {
         cost: 1e37,
-        name: "Unknown Item",
-        type: "unknownType"
+        name: "Automator",
+        type: "automator",
+        state: { planes: [], maxConnections: 1, powered: false }
     },
     unobtainium: {
         cost: 1e45,
-        name: "Unknown Item",
-        type: "unknownType"
+        name: "National Grid",
+        type: "passive",
+        state: "unobtainium"
     },
     ultimatum: {
         cost: 1e54,
-        name: "Unknown Item",
-        type: "unknownType"
+        name: "Investments",
+        type: "investments"
     }
-} as Record<
+} as const satisfies Record<
     Resources,
     {
         cost: DecimalSource;
@@ -199,6 +206,25 @@ const tools = {
         state?: State;
     }
 >;
+
+const relics = {
+    dirt: "Replicator",
+    sand: "Metal Detector",
+    gravel: "Neural Networks",
+    wood: "Mining Laser",
+    stone: "BOGO Coupon",
+    coal: "Planar Intelligence",
+    copper: "Efficient Code",
+    iron: "Trade Agreements",
+    silver: "Machine Synergizer",
+    gold: "XP Market",
+    emerald: "Efficient Portals",
+    platinum: "Time Dilation",
+    diamond: "Paypal",
+    berylium: "Tiered Mining",
+    unobtainium: "Overclocked Portals",
+    ultimatum: "Rebates"
+} as const satisfies Record<Resources, string>;
 
 const passives = {
     dirt: {
@@ -216,8 +242,102 @@ const passives = {
     copper: {
         description: (empowered: boolean) =>
             empowered ? "Material level is 20% stronger" : "Material level is 10% stronger"
+    },
+    silver: {
+        description: (empowered: boolean) =>
+            empowered
+                ? "Doubles each plane's resource gain"
+                : "Quadruples each plane's resource gain"
+    },
+    diamond: {
+        description: (empowered: boolean) =>
+            empowered
+                ? "+2% plane's resource gain per repeatable purchase"
+                : "+1% plane's resource gain per repeatable purchase"
+    },
+    emerald: {
+        description: (empowered: boolean) =>
+            empowered
+                ? "+2% plane's resource gain per minute active"
+                : "+1% plane's resource gain per minute active"
+    },
+    unobtainium: {
+        description: (empowered: boolean) =>
+            empowered ? "+2 max connections per machine" : "+1 max connections per machine"
+    },
+    dirtRelic: {
+        description: (empowered: boolean) =>
+            empowered ? "Upgrades apply thrice" : "Upgrades apply twice"
+    },
+    sandRelic: {
+        description: (empowered: boolean) =>
+            empowered ? "Treasure's 2 tiers stronger" : "Treasure's 1 tier stronger"
+    },
+    gravelRelic: {
+        description: (empowered: boolean) =>
+            empowered
+                ? "+2% plane's resource gain per repeatable purchase"
+                : "+1% plane's resource gain per repeatable purchase"
+    },
+    woodRelic: {
+        description: (empowered: boolean) =>
+            empowered ? "(Relics)^2 boost mine speed" : "Relics boost mine speed"
+    },
+    stoneRelic: {
+        description: (empowered: boolean) =>
+            empowered ? "2 free levels for repeatables" : "1 free level for repeatables"
+    },
+    coalRelic: {
+        description: (empowered: boolean) =>
+            empowered ? "(Treasures)^2 boost planar speed" : "Treasures boost planar speed"
+    },
+    copperRelic: {
+        description: (empowered: boolean) =>
+            empowered ? "Power 2 machines free" : "Power 1 machine free"
+    },
+    ironRelic: {
+        description: (empowered: boolean) =>
+            empowered ? "Conversions give triple output" : "Conversions give double output"
+    },
+    silverRelic: {
+        description: (empowered: boolean) =>
+            empowered ? "(Power machines)^2 boost ore dropped" : "Power machines boost ore dropped"
+    },
+    goldRelic: {
+        description: (empowered: boolean) =>
+            empowered ? "Each treasure quadruples XP gain" : "Each treasure doubles XP gain"
+    },
+    emeraldRelic: {
+        description: (empowered: boolean) =>
+            empowered
+                ? "Creating portals costs a third the energy"
+                : "Creating portals costs half the energy"
+    },
+    platinumRelic: {
+        description: (empowered: boolean) =>
+            empowered ? "Triple dimensions' tick rate" : "Double dimensions' tick rate"
+    },
+    diamondRelic: {
+        description: (empowered: boolean) =>
+            empowered ? "Repeatables/dimensions buy max at once" : "Repeatables buy max at once"
+    },
+    beryliumRelic: {
+        description: (empowered: boolean) =>
+            empowered
+                ? "(Max tier plane finished)^2 boosts quarry speed"
+                : "Max tier plane finished boosts quarry speed"
+    },
+    unobtainiumRelic: {
+        description: (empowered: boolean) =>
+            empowered ? "ln(energy) boosts planar speed" : "log(energy) boosts planar speed"
+    },
+    ultimatumRelic: {
+        description: (empowered: boolean) =>
+            empowered
+                ? "Upgrades/repeatables/dimensions/prestige no longer spend on purchase"
+                : "Upgrades/repeatables no longer spend on purchase"
     }
-} as const;
+} as const satisfies Record<string, { description: (empowered: boolean) => string }>;
 
 export type Passives = keyof typeof passives;
 
@@ -338,11 +458,11 @@ export const main = createLayer("main", function (this: BaseLayer) {
         }, {} as Record<Resources, BoardNode>)
     );
 
-    const toolNodes: ComputedRef<Record<Resources, BoardNode>> = computed(() => ({
+    const toolNodes: ComputedRef<Record<Resources | Passives, BoardNode>> = computed(() => ({
         ...board.types.passive.nodes.value.reduce((acc, curr) => {
-            acc[curr.state as Resources] = curr;
+            acc[curr.state as Passives] = curr;
             return acc;
-        }, {} as Record<Resources, BoardNode>),
+        }, {} as Record<Resources | Passives, BoardNode>),
         sand: board.types.dowsing.nodes.value[0],
         wood: board.types.quarry.nodes.value[0],
         coal: board.types.empowerer.nodes.value[0],
@@ -775,7 +895,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
                                     id: getUniqueNodeID(board as GenericBoard),
                                     position: { ...node.position },
                                     type: tool.type,
-                                    state: tool.state
+                                    state: "state" in tool ? tool.state : undefined
                                 };
                                 board.placeInAvailableSpace(newNode);
                                 board.nodes.value.push(newNode);
@@ -976,10 +1096,12 @@ export const main = createLayer("main", function (this: BaseLayer) {
                                       })`
                         };
                     }
-                    return labelForAcceptingTool(
-                        node,
-                        passive => `Double ${tools[passive].name}'s effect`
-                    );
+                    return labelForAcceptingTool(node, passive => {
+                        if (passive.includes("Relic")) {
+                            return `Double ${relics[passive.slice(0, -5) as Resources]}'s effect`;
+                        }
+                        return `Double ${tools[passive as Resources].name}'s effect`;
+                    });
                 },
                 actionDistance: Math.PI / 4,
                 actions: [
