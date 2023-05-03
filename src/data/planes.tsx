@@ -67,23 +67,24 @@ export function createPlane(
         const resource = createResource<DecimalSource>(0, getName(random));
         const tierIndex = resourceNames.indexOf(tier);
         let difficultyRand = random();
-        if (influences.some(i => i.type === "increaseDiff")) {
+        const influenceState = influences.reduce((acc, curr) => {
+            acc[curr.type] = curr.data;
+            return acc;
+        }, {} as Record<Influences, State>);
+        if ("increaseDiff" in influenceState) {
             difficultyRand = difficultyRand / 2 + 0.5;
         }
-        if (influences.some(i => i.type === "decreaseDiff")) {
+        if ("decreaseDiff" in influenceState) {
             difficultyRand = difficultyRand / 2;
         }
-        if (influences.some(i => i.type === "relic")) {
+        if ("relic" in influenceState) {
             difficultyRand = 1;
         }
         const difficulty = difficultyRand + tierIndex + 1;
-        const rewardsLevel = influences.some(i => i.type === "increaseRewards")
-            ? difficulty + 1
-            : difficulty;
-        let length = influences.some(i => i.type === "relic")
-            ? tierIndex + 2
-            : Math.ceil(random() * (tierIndex + 2));
-        if (influences.some(i => i.type === "increaseLength")) {
+        const rewardsLevel = "increaseRewards" in influenceState ? difficulty + 1 : difficulty;
+        let length =
+            "relic" in influenceState ? tierIndex + 2 : Math.ceil(random() * (tierIndex + 2));
+        if ("increaseLength" in influenceState) {
             length++;
         }
 
@@ -346,21 +347,21 @@ export function createPlane(
                     break;
             }
             const treasureWeights = {
-                cache: influences.some(i => i.type === "increaseCaches") ? 10 : 1,
-                generation: influences.some(i => i.type === "increaseGens") ? 10 : 1,
-                resourceMulti: influences.some(i => i.type === "increaseResourceMults") ? 10 : 1,
-                energyMulti: influences.some(i => i.type === "increaseEnergyMults") ? 2.5 : 0.25,
+                cache: "increaseCaches" in influenceState ? 10 : 1,
+                generation: "increaseGens" in influenceState ? 10 : 1,
+                resourceMulti: "increaseResourceMults" in influenceState ? 10 : 1,
+                energyMulti: "increaseEnergyMults" in influenceState ? 2.5 : 0.25,
                 influences:
                     Object.keys(main.influenceNodes.value).length + influenceTreasures.length ===
                     Object.keys(influenceTypes).length
                         ? 0
-                        : influences.some(i => i.type === "increaseInfluences")
+                        : "increaseInfluences" in influenceState
                         ? 20
                         : 2,
                 relic: 0
             };
             let treasureType = pickRandom(treasureWeights, random);
-            if (i === length - 1 && influences.some(i => i.type === "relic")) {
+            if (i === length - 1 && "relic" in influenceState) {
                 treasureType = "relic";
             }
             let description = "";
@@ -408,19 +409,11 @@ export function createPlane(
                     description = `Gain ${format(resourceMulti)}x energy while plane is active.`;
                     break;
                 case "influences":
-                    const randomInfluence = pickRandom(
-                        (Object.keys(influenceTypes) as Influences[]).reduce((acc, curr) => {
-                            acc[curr] =
-                                curr in main.influenceNodes.value ||
-                                influenceTreasures.includes(curr)
-                                    ? 0
-                                    : 1;
-                            return acc;
-                        }, {} as Record<Influences, number>),
-                        random
-                    );
+                    const randomInfluence = (Object.keys(influenceTypes) as Influences[])[
+                        Math.floor(random() * Object.keys(influenceTypes).length)
+                    ];
                     influenceTreasures.push(randomInfluence);
-                    description = `Gain a new portal influence`;
+                    description = `Gain a new portal influence (${influenceTypes[randomInfluence].display})`;
                     onComplete = () => {
                         if (randomInfluence in main.influenceNodes.value) {
                             toast.warning(
