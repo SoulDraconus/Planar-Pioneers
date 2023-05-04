@@ -3,11 +3,11 @@ import SpacerVue from "components/layout/Spacer.vue";
 import StickyVue from "components/layout/Sticky.vue";
 import { GenericAchievement, createAchievement } from "features/achievements/achievement";
 import { BoardNode, getUniqueNodeID } from "features/boards/board";
-import { jsx } from "features/feature";
-import { createRepeatable } from "features/repeatable";
+import { findFeatures, jsx } from "features/feature";
+import { GenericRepeatable, RepeatableType, createRepeatable } from "features/repeatable";
 import { createResource } from "features/resources/resource";
 import { addTooltip } from "features/tooltips/tooltip";
-import { createUpgrade } from "features/upgrades/upgrade";
+import { GenericUpgrade, UpgradeType, createUpgrade } from "features/upgrades/upgrade";
 import Formula, { unrefFormulaSource } from "game/formulas/formulas";
 import { FormulaSource, GenericFormula } from "game/formulas/types";
 import { BaseLayer, createLayer } from "game/layers";
@@ -65,6 +65,7 @@ export function createPlane(
         const color = getColor([0.64, 0.75, 0.55], random);
         const background = getColor([0.18, 0.2, 0.25], random);
         const resource = createResource<DecimalSource>(0, getName(random));
+        const timeActive = persistent<DecimalSource>(0);
         const tierIndex = resourceNames.indexOf(tier);
         let difficultyRand = random();
         const influenceState = influences.reduce((acc, curr) => {
@@ -89,7 +90,31 @@ export function createPlane(
         }
 
         const resourceModifiers: WithRequired<Modifier, "description" | "invert">[] = [];
-        const resourceGainModifier = createSequentialModifier(() => resourceModifiers);
+        const resourceGainModifier = createSequentialModifier(() => [
+            ...resourceModifiers,
+            createMultiplicativeModifier(() => ({
+                multiplier: () => (main.isEmpowered("silver") ? 4 : 2),
+                description: () =>
+                    (main.isEmpowered("silver") ? "Empowered " : "") + main.tools.silver.name,
+                enabled: () => main.toolNodes.value.silver != null
+            })),
+            createMultiplicativeModifier(() => ({
+                multiplier: () =>
+                    ((main.isEmpowered("diamond") ? 2 : 1) *
+                        upgrades.filter(u => u.bought.value).length) /
+                    10,
+                description: () =>
+                    (main.isEmpowered("diamond") ? "Empowered " : "") + main.tools.diamond.name,
+                enabled: () => main.toolNodes.value.diamond != null
+            })),
+            createMultiplicativeModifier(() => ({
+                multiplier: () =>
+                    Decimal.div(timeActive.value, 6000).times(main.isEmpowered("emerald") ? 2 : 1),
+                description: () =>
+                    (main.isEmpowered("emerald") ? "Empowered " : "") + main.tools.emerald.name,
+                enabled: () => main.toolNodes.value.emerald != null
+            }))
+        ]);
         const computedResourceGain = computed(() => resourceGainModifier.apply(0));
 
         const previews: {
@@ -492,6 +517,15 @@ export function createPlane(
             visibility = milestone.earned;
         }
 
+        const upgrades = findFeatures(
+            features as unknown as Record<string, unknown>,
+            UpgradeType
+        ) as GenericUpgrade[];
+        const repeatables = findFeatures(
+            features as unknown as Record<string, unknown>,
+            RepeatableType
+        ) as GenericRepeatable[];
+
         const [resourceTab, resourceTabCollapsed] = createCollapsibleModifierSections(() => [
             {
                 title: `${camelToTitle(resource.displayName)} Gain`,
@@ -519,6 +553,7 @@ export function createPlane(
                 return;
             }
 
+            timeActive.value = Decimal.add(timeActive.value, diff);
             resource.value = Decimal.times(computedResourceGain.value, diff).add(resource.value);
 
             earnedTreasures.value.forEach(treasure => {
@@ -645,6 +680,7 @@ export function createPlane(
             resourceMultis,
             earnedTreasures,
             showNotif,
+            timeActive,
             display: jsx(() => (
                 <>
                     <StickyVue class="nav-container" style="z-index: 5">

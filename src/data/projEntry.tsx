@@ -252,8 +252,8 @@ const passives = {
     diamond: {
         description: (empowered: boolean) =>
             empowered
-                ? "+2% plane's resource gain per repeatable purchase"
-                : "+1% plane's resource gain per repeatable purchase"
+                ? "+20% plane's resource gain per upgrade bought"
+                : "+10% plane's resource gain per upgrade bought"
     },
     emerald: {
         description: (empowered: boolean) =>
@@ -476,6 +476,14 @@ export const main = createLayer("main", function (this: BaseLayer) {
         }, {} as Record<Influences, BoardNode>)
     }));
 
+    function isEmpowered(passive: Passives) {
+        return (
+            empowerer.value != null &&
+            isPowered(empowerer.value) &&
+            (empowerer.value.state as unknown as EmpowererState).tools.includes(passive)
+        );
+    }
+
     const resourceLevels = computed(() =>
         resourceNames.reduce((acc, curr) => {
             const amount =
@@ -544,20 +552,19 @@ export const main = createLayer("main", function (this: BaseLayer) {
         });
     });
 
-    const poweredMachines: ComputedRef<number> = computed(() => {
+    const numPoweredMachines: ComputedRef<number> = computed(() => {
         return (
-            [mine, dowsing, quarry, empowerer].filter(
-                node => (node.value?.state as { powered: boolean })?.powered
-            ).length +
+            poweredMachines.filter(node => (node.value?.state as { powered: boolean })?.powered)
+                .length +
             board.types.portal.nodes.value.filter(
                 node => (node.state as { powered: boolean }).powered
             ).length
         );
     });
     const nextPowerCost = computed(() =>
-        Decimal.eq(poweredMachines.value, 0)
+        Decimal.eq(numPoweredMachines.value, 0)
             ? 10
-            : Decimal.add(poweredMachines.value, 1).pow_base(100).div(10).times(0.99)
+            : Decimal.add(numPoweredMachines.value, 1).pow_base(100).div(10).times(0.99)
     );
 
     const quarryProgressRequired = computed(() => {
@@ -653,12 +660,18 @@ export const main = createLayer("main", function (this: BaseLayer) {
                 }
                 node.state = {
                     ...(node.state as object),
-                    maxConnections: (node.state as { maxConnections: number }).maxConnections + 1
+                    maxConnections: Decimal.add(
+                        (node.state as { maxConnections: number }).maxConnections,
+                        1
+                    )
                 };
                 board.selectedAction.value = null;
             },
             visibility: (node: BoardNode) =>
-                (node.state as { maxConnections: number }).maxConnections < maxConnections
+                Decimal.add(
+                    (node.state as { maxConnections: number }).maxConnections,
+                    computedBonusConnectionsModifier.value
+                ).lt(maxConnections)
         };
     }
 
@@ -674,7 +687,11 @@ export const main = createLayer("main", function (this: BaseLayer) {
             if (resources.includes(resource)) {
                 return { text: "Disconnect", color: "var(--accent2)" };
             }
-            if (resources.length === maxConnections) {
+            if (
+                Decimal.add(maxConnections, computedBonusConnectionsModifier.value).lte(
+                    resources.length
+                )
+            ) {
                 return { text: "Max connections", color: "var(--danger)" };
             }
             return {
@@ -695,7 +712,11 @@ export const main = createLayer("main", function (this: BaseLayer) {
             if (tools.includes(passive)) {
                 return { text: "Disconnect", color: "var(--accent2)" };
             }
-            if (tools.length === maxConnections) {
+            if (
+                Decimal.add(maxConnections, computedBonusConnectionsModifier.value).lte(
+                    tools.length
+                )
+            ) {
                 return { text: "Max connections", color: "var(--danger)" };
             }
             return {
@@ -715,7 +736,11 @@ export const main = createLayer("main", function (this: BaseLayer) {
         if (resources.includes(resource)) {
             return true;
         }
-        if (resources.length === maxConnections) {
+        if (
+            Decimal.add(maxConnections, computedBonusConnectionsModifier.value).lte(
+                resources.length
+            )
+        ) {
             return false;
         }
         return true;
@@ -750,7 +775,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
         if (tools.includes(passive)) {
             return true;
         }
-        if (tools.length === maxConnections) {
+        if (Decimal.add(maxConnections, computedBonusConnectionsModifier.value).lte(tools.length)) {
             return false;
         }
         return true;
@@ -978,22 +1003,13 @@ export const main = createLayer("main", function (this: BaseLayer) {
                     node === board.selectedNode.value
                         ? {
                               text: passives[node.state as Passives].description(
-                                  empowerer.value != null &&
-                                      isPowered(empowerer.value) &&
-                                      (
-                                          empowerer.value.state as unknown as EmpowererState
-                                      ).tools.includes(node.state as Passives)
+                                  isEmpowered(node.state as Passives)
                               )
                           }
                         : null,
                 outlineColor: "var(--bought)",
                 classes: node => ({
-                    "affected-node":
-                        empowerer.value != null &&
-                        isPowered(empowerer.value) &&
-                        (empowerer.value.state as unknown as EmpowererState).tools.includes(
-                            node.state as Passives
-                        )
+                    "affected-node": isEmpowered(node.state as Passives)
                 }),
                 draggable: true
             },
@@ -1010,9 +1026,10 @@ export const main = createLayer("main", function (this: BaseLayer) {
                                     : `Dowsing (${
                                           (node.state as { resources: Resources[] }).resources
                                               .length
-                                      }/${
-                                          (node.state as { maxConnections: number }).maxConnections
-                                      })`
+                                      }/${Decimal.add(
+                                          (node.state as { maxConnections: number }).maxConnections,
+                                          computedBonusConnectionsModifier.value
+                                      )})`
                         };
                     }
                     return labelForAcceptingResource(node, resource => `Double ${resource} odds`);
@@ -1043,9 +1060,10 @@ export const main = createLayer("main", function (this: BaseLayer) {
                                     : `Quarrying (${
                                           (node.state as { resources: Resources[] }).resources
                                               .length
-                                      }/${
-                                          (node.state as { maxConnections: number }).maxConnections
-                                      })`
+                                      }/${Decimal.add(
+                                          (node.state as { maxConnections: number }).maxConnections,
+                                          computedBonusConnectionsModifier.value
+                                      )})`
                         };
                     }
                     return labelForAcceptingResource(
@@ -1091,9 +1109,10 @@ export const main = createLayer("main", function (this: BaseLayer) {
                                     ? "Empowerer - Drag a tool to me!"
                                     : `Empowering (${
                                           (node.state as { tools: Passives[] }).tools.length
-                                      }/${
-                                          (node.state as { maxConnections: number }).maxConnections
-                                      })`
+                                      }/${Decimal.add(
+                                          (node.state as { maxConnections: number }).maxConnections,
+                                          computedBonusConnectionsModifier.value
+                                      )})`
                         };
                     }
                     return labelForAcceptingTool(node, passive => {
@@ -1503,6 +1522,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
     const portalGenerator: ComputedRef<BoardNode | undefined> = computed(
         () => toolNodes.value.iron
     );
+    const poweredMachines = [mine, dowsing, quarry, empowerer];
 
     function grantResource(type: Resources, amount: DecimalSource) {
         let node = resourceNodes.value[type];
@@ -1575,19 +1595,9 @@ export const main = createLayer("main", function (this: BaseLayer) {
             }))
         ),
         createMultiplicativeModifier(() => ({
-            multiplier: () =>
-                empowerer.value != null &&
-                isPowered(empowerer.value) &&
-                (empowerer.value.state as unknown as EmpowererState).tools.includes("stone")
-                    ? 4
-                    : 2,
-            description: () =>
-                (empowerer.value != null &&
-                isPowered(empowerer.value) &&
-                (empowerer.value.state as unknown as EmpowererState).tools.includes("stone")
-                    ? "Empowered "
-                    : "") + tools.stone.name,
-            enabled: () => toolNodes.value["stone"] != null
+            multiplier: () => (isEmpowered("stone") ? 4 : 2),
+            description: () => (isEmpowered("stone") ? "Empowered " : "") + tools.stone.name,
+            enabled: () => toolNodes.value.stone != null
         })),
         createMultiplicativeModifier(() => ({
             multiplier: () => planarMultis.value.energy ?? 1,
@@ -1595,66 +1605,46 @@ export const main = createLayer("main", function (this: BaseLayer) {
             enabled: () => Decimal.neq(planarMultis.value.energy ?? 1, 1)
         })),
         createAdditiveModifier(() => ({
-            addend: () => Decimal.pow(100, poweredMachines.value).div(10).neg(),
+            addend: () => Decimal.pow(100, numPoweredMachines.value).div(10).neg(),
             description: "Powered Machines (100^n/10 energy/s)",
-            enabled: () => Decimal.gt(poweredMachines.value, 0)
+            enabled: () => Decimal.gt(numPoweredMachines.value, 0)
         }))
     ]);
     const computedEnergyModifier = computed(() => energyModifier.apply(1));
 
+    const bonusConnectionsModifier = createSequentialModifier(() => [
+        createAdditiveModifier(() => ({
+            addend: () => (isEmpowered("unobtainium") ? 2 : 1),
+            description: () =>
+                (isEmpowered("unobtainium") ? "Empowered " : "") + tools.unobtainium.name,
+            enabled: () => toolNodes.value.unobtainium != null
+        }))
+    ]);
+    const computedBonusConnectionsModifier = computed(() => bonusConnectionsModifier.apply(0));
+
     const miningSpeedModifier = createSequentialModifier(() => [
         createMultiplicativeModifier(() => ({
-            multiplier: () =>
-                empowerer.value != null &&
-                isPowered(empowerer.value) &&
-                (empowerer.value.state as unknown as EmpowererState).tools.includes("dirt")
-                    ? 4
-                    : 2,
-            description: () =>
-                (empowerer.value != null &&
-                isPowered(empowerer.value) &&
-                (empowerer.value.state as unknown as EmpowererState).tools.includes("dirt")
-                    ? "Empowered "
-                    : "") + tools.dirt.name,
-            enabled: () => toolNodes.value["dirt"] != null
+            multiplier: () => (isEmpowered("dirt") ? 4 : 2),
+            description: () => (isEmpowered("dirt") ? "Empowered " : "") + tools.dirt.name,
+            enabled: () => toolNodes.value.dirt != null
         }))
     ]);
     const computedMiningSpeedModifier = computed(() => miningSpeedModifier.apply(1));
 
     const materialGainModifier = createSequentialModifier(() => [
         createMultiplicativeModifier(() => ({
-            multiplier: () =>
-                empowerer.value != null &&
-                isPowered(empowerer.value) &&
-                (empowerer.value.state as unknown as EmpowererState).tools.includes("gravel")
-                    ? 4
-                    : 2,
-            description: () =>
-                (empowerer.value != null &&
-                isPowered(empowerer.value) &&
-                (empowerer.value.state as unknown as EmpowererState).tools.includes("gravel")
-                    ? "Empowered "
-                    : "") + tools.gravel.name,
-            enabled: () => toolNodes.value["gravel"] != null
+            multiplier: () => (isEmpowered("gravel") ? 4 : 2),
+            description: () => (isEmpowered("gravel") ? "Empowered " : "") + tools.gravel.name,
+            enabled: () => toolNodes.value.gravel != null
         }))
     ]);
     const computedMaterialGainModifier = computed(() => materialGainModifier.apply(1));
 
     const materialLevelEffectModifier = createSequentialModifier(() => [
         createAdditiveModifier(() => ({
-            addend: () =>
-                empowerer.value != null &&
-                isPowered(empowerer.value) &&
-                (empowerer.value.state as unknown as EmpowererState).tools.includes("copper")
-                    ? 0.002
-                    : 0.001,
-            description: () =>
-                (empowerer.value != null &&
-                isPowered(empowerer.value) &&
-                (empowerer.value.state as unknown as EmpowererState).tools.includes("copper")
-                    ? "Empowered "
-                    : "") + tools.copper.name,
-            enabled: () => toolNodes.value["copper"] != null
+            addend: () => (isEmpowered("copper") ? 0.002 : 0.001),
+            description: () => (isEmpowered("copper") ? "Empowered " : "") + tools.copper.name,
+            enabled: () => toolNodes.value.copper != null
         }))
     ]);
     const computedmaterialLevelEffectModifier = computed(() =>
@@ -1705,6 +1695,11 @@ export const main = createLayer("main", function (this: BaseLayer) {
             modifier: energyModifier,
             base: 1,
             unit: "/s"
+        },
+        {
+            title: "Bonus Connections",
+            modifier: bonusConnectionsModifier,
+            base: 0
         }
     ]);
     const [miningTab, miningTabCollapsed] = createCollapsibleModifierSections(() => [
@@ -1713,19 +1708,19 @@ export const main = createLayer("main", function (this: BaseLayer) {
             modifier: miningSpeedModifier,
             base: 1,
             unit: "/s",
-            visible: () => toolNodes.value["dirt"] != null
+            visible: () => toolNodes.value.dirt != null
         },
         {
             title: "Ore Dropped",
             modifier: materialGainModifier,
             base: 1,
-            visible: () => toolNodes.value["gravel"] != null
+            visible: () => toolNodes.value.gravel != null
         },
         {
             title: "Material Level Effect",
             modifier: materialLevelEffectModifier,
             base: 1.01,
-            visible: () => toolNodes.value["copper"] != null
+            visible: () => toolNodes.value.copper != null
         }
     ]);
     const [resourcesTab, resourcesCollapsed] = createCollapsibleModifierSections(() =>
@@ -1736,7 +1731,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
     );
     const modifierTabs = createTabFamily({
         general: () => ({
-            display: "Energy",
+            display: "General",
             glowColor(): string {
                 return modifierTabs.activeTab.value === this.tab ? "white" : "";
             },
@@ -1906,9 +1901,9 @@ export const main = createLayer("main", function (this: BaseLayer) {
     const energyProductionChange = computed(() => {
         if (board.selectedAction.value === togglePoweredAction) {
             return (board.selectedNode.value?.state as { powered: boolean }).powered
-                ? Decimal.eq(poweredMachines.value, 1)
+                ? Decimal.eq(numPoweredMachines.value, 1)
                     ? 10
-                    : Decimal.pow(100, poweredMachines.value).div(10).times(0.99)
+                    : Decimal.pow(100, numPoweredMachines.value).div(10).times(0.99)
                 : Decimal.neg(nextPowerCost.value);
         }
         return 0;
@@ -1930,6 +1925,65 @@ export const main = createLayer("main", function (this: BaseLayer) {
         });
     });
 
+    watch(computedBonusConnectionsModifier, (curr, prev) => {
+        if (Decimal.lt(curr, prev)) {
+            if (dowsing.value) {
+                const maxConnections = (dowsing.value.state as unknown as DowsingState)
+                    .maxConnections;
+                if (
+                    Decimal.lt(
+                        (dowsing.value.state as unknown as DowsingState).resources.length,
+                        Decimal.add(maxConnections, curr)
+                    )
+                ) {
+                    dowsing.value.state = {
+                        ...(dowsing.value.state as object),
+                        resources: (dowsing.value.state as unknown as DowsingState).resources.slice(
+                            0,
+                            Decimal.add(maxConnections, curr).toNumber()
+                        )
+                    };
+                }
+            }
+            if (quarry.value) {
+                const maxConnections = (quarry.value.state as unknown as QuarryState)
+                    .maxConnections;
+                if (
+                    Decimal.lt(
+                        (quarry.value.state as unknown as QuarryState).resources.length,
+                        Decimal.add(maxConnections, curr)
+                    )
+                ) {
+                    quarry.value.state = {
+                        ...(quarry.value.state as object),
+                        resources: (quarry.value.state as unknown as QuarryState).resources.slice(
+                            0,
+                            Decimal.add(maxConnections, curr).toNumber()
+                        )
+                    };
+                }
+            }
+            if (empowerer.value) {
+                const maxConnections = (empowerer.value.state as unknown as EmpowererState)
+                    .maxConnections;
+                if (
+                    Decimal.lt(
+                        (empowerer.value.state as unknown as EmpowererState).tools.length,
+                        Decimal.add(maxConnections, curr)
+                    )
+                ) {
+                    empowerer.value.state = {
+                        ...(empowerer.value.state as object),
+                        resources: (empowerer.value.state as unknown as EmpowererState).tools.slice(
+                            0,
+                            Decimal.add(maxConnections, curr).toNumber()
+                        )
+                    };
+                }
+            }
+        }
+    });
+
     return {
         name: "World",
         board,
@@ -1943,6 +1997,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
         influenceNodes,
         grantResource,
         activePortals,
+        isEmpowered,
         display: jsx(() => (
             <>
                 <StickyVue class="nav-container">
@@ -1960,10 +2015,10 @@ export const main = createLayer("main", function (this: BaseLayer) {
                         </h3>
                         /s)
                     </span>
-                    {Decimal.gt(poweredMachines.value, 0) ? (
+                    {Decimal.gt(numPoweredMachines.value, 0) ? (
                         <span class="nav-segment">
                             <h3 style="color: var(--accent1); text-shadow: 0px 0px 10px var(--accent1);">
-                                {formatWhole(poweredMachines.value)}
+                                {formatWhole(numPoweredMachines.value)}
                             </h3>{" "}
                             machines powered
                         </span>
