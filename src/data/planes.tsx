@@ -29,6 +29,7 @@ import { VueFeature, render, renderRow, trackHover } from "util/vue";
 import { ComputedRef, Ref, computed, ref, unref } from "vue";
 import { createCollapsibleModifierSections, createFormulaPreview, estimateTime } from "./common";
 import {
+    BoosterState,
     InfluenceState,
     Influences,
     influences as influenceTypes,
@@ -45,7 +46,7 @@ import TooltipVue from "features/tooltips/Tooltip.vue";
 const toast = useToast();
 
 export type Treasure = GenericAchievement & {
-    update?: (diff: number) => void;
+    update?: (diff: DecimalSource) => void;
     link?: ComputedRef<BoardNode>;
     effectedResource?: Resources | "energy";
     resourceMulti: DecimalSource;
@@ -390,7 +391,7 @@ export function createPlane(
                 treasureType = "relic";
             }
             let description = "";
-            let update: (diff: number) => void;
+            let update: (diff: DecimalSource) => void;
             let onComplete: VoidFunction;
             let link: ComputedRef<BoardNode>;
             let randomResource: Resources;
@@ -526,12 +527,40 @@ export function createPlane(
             RepeatableType
         ) as GenericRepeatable[];
 
+        const planarSpeedModifier = createSequentialModifier(() => [
+            createMultiplicativeModifier(() => ({
+                multiplier: () =>
+                    Decimal.add(
+                        (
+                            main.board.types.booster.nodes.value[0]?.state as unknown as
+                                | BoosterState
+                                | undefined
+                        )?.level ?? 0,
+                        1
+                    ),
+                description: "Booster",
+                enabled: () =>
+                    (
+                        main.board.types.booster.nodes.value[0]?.state as unknown as
+                            | BoosterState
+                            | undefined
+                    )?.portals.includes(id) ?? false
+            }))
+        ]);
+        const computedPlanarSpeedModifier = computed(() => planarSpeedModifier.apply(1));
+
         const [resourceTab, resourceTabCollapsed] = createCollapsibleModifierSections(() => [
             {
                 title: `${camelToTitle(resource.displayName)} Gain`,
                 modifier: resourceGainModifier,
                 base: 0,
                 unit: "/s"
+            },
+            {
+                title: `${camelToTitle(resource.displayName)} Time Speed`,
+                modifier: planarSpeedModifier,
+                base: 1,
+                visible: () => Decimal.gt(computedPlanarSpeedModifier.value, 1)
             }
         ]);
         const showModifiersModal = ref(false);
@@ -552,12 +581,15 @@ export function createPlane(
             ) {
                 return;
             }
+            const totalDiff = Decimal.times(computedPlanarSpeedModifier.value, diff);
 
-            timeActive.value = Decimal.add(timeActive.value, diff);
-            resource.value = Decimal.times(computedResourceGain.value, diff).add(resource.value);
+            timeActive.value = Decimal.add(timeActive.value, totalDiff);
+            resource.value = Decimal.times(computedResourceGain.value, totalDiff).add(
+                resource.value
+            );
 
             earnedTreasures.value.forEach(treasure => {
-                treasure.update?.(diff);
+                treasure.update?.(totalDiff);
             });
         });
 

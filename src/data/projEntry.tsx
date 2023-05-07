@@ -79,6 +79,13 @@ export interface InfluenceState {
     data: State;
 }
 
+export interface BoosterState {
+    portals: string[];
+    maxConnections: number;
+    powered: boolean;
+    level: DecimalSource;
+}
+
 export const mineLootTable = {
     dirt: 120,
     sand: 60,
@@ -160,7 +167,7 @@ const tools = {
         cost: 1e15,
         name: "Booster",
         type: "booster",
-        state: { planes: [], maxConnections: 1, powered: false }
+        state: { planes: [], maxConnections: 1, powered: false, level: 1 }
     },
     emerald: {
         cost: 1e19,
@@ -195,7 +202,8 @@ const tools = {
     ultimatum: {
         cost: 1e54,
         name: "Investments",
-        type: "investments"
+        type: "investments",
+        state: { planes: [], maxConnections: 1, powered: false }
     }
 } as const satisfies Record<
     Resources,
@@ -443,6 +451,8 @@ export const influences = {
 >;
 export type Influences = keyof typeof influences;
 
+const increaseBoostFormula = Formula.variable(0).add(8).times(2).pow10();
+
 /**
  * @hidden
  */
@@ -466,7 +476,8 @@ export const main = createLayer("main", function (this: BaseLayer) {
         sand: board.types.dowsing.nodes.value[0],
         wood: board.types.quarry.nodes.value[0],
         coal: board.types.empowerer.nodes.value[0],
-        iron: board.types.portalGenerator.nodes.value[0]
+        iron: board.types.portalGenerator.nodes.value[0],
+        gold: board.types.booster.nodes.value[0]
     }));
 
     const influenceNodes: ComputedRef<Record<Influences, BoardNode>> = computed(() => ({
@@ -727,6 +738,33 @@ export const main = createLayer("main", function (this: BaseLayer) {
         return null;
     }
 
+    function labelForAcceptingPortal(
+        node: BoardNode,
+        description: (portal: string) => string
+    ): NodeLabel | null {
+        if ((board as GenericBoard).draggingNode.value?.type === "portal") {
+            const portal = (
+                (board as GenericBoard).draggingNode.value?.state as unknown as PortalState
+            ).id;
+            const { maxConnections, portals } = node.state as unknown as BoosterState;
+            if (portals.includes(portal)) {
+                return { text: "Disconnect", color: "var(--accent2)" };
+            }
+            if (
+                Decimal.add(maxConnections, computedBonusConnectionsModifier.value).lte(
+                    portals.length
+                )
+            ) {
+                return { text: "Max connections", color: "var(--danger)" };
+            }
+            return {
+                text: description(portal),
+                color: "var(--accent2)"
+            };
+        }
+        return null;
+    }
+
     function canAcceptResource(node: BoardNode, otherNode: BoardNode) {
         if (otherNode.type !== "resource") {
             return false;
@@ -796,6 +834,43 @@ export const main = createLayer("main", function (this: BaseLayer) {
             node.state = {
                 ...(node.state as object),
                 tools: [...tools, passive]
+            };
+        }
+        board.selectedNode.value = node;
+    }
+
+    function canAcceptPortal(node: BoardNode, otherNode: BoardNode) {
+        if (otherNode.type !== "portal") {
+            return false;
+        }
+        const portal = (otherNode.state as unknown as PortalState).id;
+        const { maxConnections, portals } = node.state as unknown as BoosterState;
+        if (portals.includes(portal)) {
+            return true;
+        }
+        if (
+            Decimal.add(maxConnections, computedBonusConnectionsModifier.value).lte(portals.length)
+        ) {
+            return false;
+        }
+        return true;
+    }
+
+    function onDropPortal(node: BoardNode, otherNode: BoardNode) {
+        if (otherNode.type !== "portal") {
+            return;
+        }
+        const portal = (otherNode.state as unknown as PortalState).id;
+        const { portals } = node.state as unknown as BoosterState;
+        if (portals.includes(portal)) {
+            node.state = {
+                ...(node.state as object),
+                tools: portals.filter(r => r !== portal)
+            };
+        } else {
+            node.state = {
+                ...(node.state as object),
+                tools: [...portals, portal]
             };
         }
         board.selectedNode.value = node;
@@ -1368,6 +1443,95 @@ export const main = createLayer("main", function (this: BaseLayer) {
                 },
                 outlineColor: "var(--danger)",
                 draggable: true
+            },
+            booster: {
+                shape: Shape.Diamond,
+                size: 50,
+                title: "⌛",
+                label: node => {
+                    if (node === board.selectedNode.value) {
+                        return {
+                            text:
+                                (node.state as unknown as BoosterState).portals.length === 0
+                                    ? "Booster - Drag a portal to me!"
+                                    : `Boosting by ${formatWhole(
+                                          Decimal.add(
+                                              1,
+                                              (node.state as unknown as BoosterState).level
+                                          )
+                                      )}x (${
+                                          (node.state as { tools: Passives[] }).tools.length
+                                      }/${Decimal.add(
+                                          (node.state as { maxConnections: number }).maxConnections,
+                                          computedBonusConnectionsModifier.value
+                                      )})`
+                        };
+                    }
+                    return labelForAcceptingPortal(node, portal => {
+                        return `Boost ${(layers[portal] as GenericPlane).name}'s speed`;
+                    });
+                },
+                actionDistance: Math.PI / 4,
+                actions: [
+                    {
+                        id: "deselect",
+                        icon: "close",
+                        tooltip: {
+                            text: "Disconnect portals"
+                        },
+                        onClick(node: BoardNode) {
+                            node.state = { ...(node.state as object), portals: [] };
+                            board.selectedAction.value = null;
+                            board.selectedNode.value = null;
+                        },
+                        visibility: (node: BoardNode) =>
+                            (node.state as unknown as BoosterState)?.portals.length ?? 0 > 0
+                    },
+                    getIncreaseConnectionsAction(x => x.add(6).pow_base(1000)),
+                    {
+                        id: "increaseBoost",
+                        icon: "arrow_upward",
+                        tooltip(node: BoardNode) {
+                            return {
+                                text: `Increase boost - ${formatWhole(
+                                    increaseBoostFormula.evaluate(
+                                        (node.state as unknown as BoosterState).level
+                                    )
+                                )} energy`
+                            };
+                        },
+                        confirmationLabel(node: BoardNode) {
+                            return Decimal.gte(
+                                energy.value,
+                                increaseBoostFormula.evaluate(
+                                    (node.state as unknown as BoosterState).level
+                                )
+                            )
+                                ? { text: "Tap again to confirm" }
+                                : { text: "Cannot afford", color: "var(--danger)" };
+                        },
+                        onClick(node: BoardNode) {
+                            const cost = increaseBoostFormula.evaluate(
+                                (node.state as unknown as BoosterState).level
+                            );
+                            if (Decimal.gte(energy.value, cost)) {
+                                energy.value = Decimal.sub(energy.value, cost);
+                            }
+                            node.state = {
+                                ...(node.state as object),
+                                level: Decimal.add((node.state as unknown as BoosterState).level, 1)
+                            };
+                            board.selectedAction.value = null;
+                        }
+                    },
+                    togglePoweredAction
+                ],
+                canAccept: canAcceptPortal,
+                onDrop: onDropPortal,
+                classes: node => ({
+                    running: isPowered(node)
+                }),
+                draggable: true
             }
         },
         style: {
@@ -1491,6 +1655,21 @@ export const main = createLayer("main", function (this: BaseLayer) {
                     return links;
                 });
             }
+            if (booster.value != null) {
+                (booster.value.state as unknown as BoosterState).portals.forEach(portal => {
+                    links.push({
+                        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                        startNode: booster.value!,
+                        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                        endNode: (board as GenericBoard).types.portal.nodes.value.find(
+                            node => (node.state as unknown as PortalState).id === portal
+                        )!,
+                        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                        stroke: isPowered(booster.value!) ? "var(--accent1)" : "var(--foreground)",
+                        strokeWidth: 4
+                    });
+                });
+            }
             Object.values(influenceNodes.value).forEach(node => {
                 const state = node.state as unknown as InfluenceState;
                 if (state.type === "increaseResources" || state.type === "decreaseResources") {
@@ -1522,7 +1701,8 @@ export const main = createLayer("main", function (this: BaseLayer) {
     const portalGenerator: ComputedRef<BoardNode | undefined> = computed(
         () => toolNodes.value.iron
     );
-    const poweredMachines = [mine, dowsing, quarry, empowerer];
+    const booster: ComputedRef<BoardNode | undefined> = computed(() => toolNodes.value.gold);
+    const poweredMachines = [mine, dowsing, quarry, empowerer, booster];
 
     function grantResource(type: Resources, amount: DecimalSource) {
         let node = resourceNodes.value[type];
@@ -1975,6 +2155,24 @@ export const main = createLayer("main", function (this: BaseLayer) {
                     empowerer.value.state = {
                         ...(empowerer.value.state as object),
                         resources: (empowerer.value.state as unknown as EmpowererState).tools.slice(
+                            0,
+                            Decimal.add(maxConnections, curr).toNumber()
+                        )
+                    };
+                }
+            }
+            if (booster.value) {
+                const maxConnections = (booster.value.state as unknown as BoosterState)
+                    .maxConnections;
+                if (
+                    Decimal.lt(
+                        (booster.value.state as unknown as BoosterState).portals.length,
+                        Decimal.add(maxConnections, curr)
+                    )
+                ) {
+                    booster.value.state = {
+                        ...(booster.value.state as object),
+                        resources: (booster.value.state as unknown as BoosterState).portals.slice(
                             0,
                             Decimal.add(maxConnections, curr).toNumber()
                         )
