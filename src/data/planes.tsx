@@ -3,9 +3,9 @@ import SpacerVue from "components/layout/Spacer.vue";
 import StickyVue from "components/layout/Sticky.vue";
 import { GenericAchievement, createAchievement } from "features/achievements/achievement";
 import { BoardNode, getUniqueNodeID } from "features/boards/board";
-import { findFeatures, jsx } from "features/feature";
+import { CoercableComponent, findFeatures, isVisible, jsx } from "features/feature";
 import { GenericRepeatable, RepeatableType, createRepeatable } from "features/repeatable";
-import { createResource } from "features/resources/resource";
+import { createResource, displayResource } from "features/resources/resource";
 import { addTooltip } from "features/tooltips/tooltip";
 import { GenericUpgrade, UpgradeType, createUpgrade } from "features/upgrades/upgrade";
 import Formula, { unrefFormulaSource } from "game/formulas/formulas";
@@ -42,6 +42,9 @@ import type { ResourceState, Resources, PortalState } from "./projEntry";
 import { getColor, getName, sfc32 } from "./utils";
 import { useToast } from "vue-toastification";
 import TooltipVue from "features/tooltips/Tooltip.vue";
+import { createConversion, createCumulativeConversion } from "features/conversion";
+import { createClickable } from "features/clickables/clickable";
+import ResourceVue from "features/resources/Resource.vue";
 
 const toast = useToast();
 
@@ -123,6 +126,7 @@ export function createPlane(
             modifier: Modifier;
             cost: FormulaSource;
         }[] = [];
+        const displays: Record<number, CoercableComponent> = {};
 
         function prepareFeature({
             feature,
@@ -130,14 +134,16 @@ export function createPlane(
             modifier,
             cost,
             previewModifier,
-            showETA
+            showETA,
+            previewCost
         }: {
             feature: VueFeature;
             canClick: Computable<boolean>;
             modifier: WithRequired<Modifier, "description" | "invert">;
             cost: FormulaSource;
-            previewModifier?: WithRequired<Modifier, "invert">;
+            previewModifier: WithRequired<Modifier, "invert">;
             showETA?: Computable<boolean | undefined>;
+            previewCost?: FormulaSource;
         }) {
             canClick = convertComputable(canClick);
             showETA = convertComputable(showETA);
@@ -147,20 +153,28 @@ export function createPlane(
                 shouldShowPreview: computed(
                     () => unref(canClick as ProcessedComputable<boolean>) && isHovering.value
                 ),
-                modifier: previewModifier ?? modifier,
-                cost
+                modifier: createSequentialModifier(() => {
+                    const modifiers = resourceModifiers.slice() as WithRequired<
+                        Modifier,
+                        "invert"
+                    >[];
+                    modifiers.splice(modifiers.indexOf(modifier), 1, previewModifier);
+                    return modifiers;
+                }),
+                cost: previewCost ?? cost
             });
             resourceModifiers.push(modifier);
             const eta = estimateTime(resource, computedResourceGain, () =>
                 unrefFormulaSource(cost)
             );
-            addTooltip(feature, {
+            const tooltip = addTooltip(feature, {
                 display:
                     showETA == null
                         ? eta
                         : () => (unref(showETA as ProcessedComputable<boolean>) ? eta.value : ""),
                 direction: Direction.Down
             });
+            return { isHovering, eta, tooltip };
         }
 
         const features: VueFeature[][] = [];
@@ -179,8 +193,8 @@ export function createPlane(
         for (let i = 0; i < length; i++) {
             const featureWeights = {
                 upgrades: 32,
-                repeatables: i <= 1 ? 0 : 16
-                // conversion: i <= 3 ? 0 : 8,
+                repeatables: i <= 1 ? 0 : 16,
+                conversion: i <= 3 ? 0 : 8
                 // xp: i <= 5 ? 0 : 4,
                 // dimensions: i <= 7 ? 0 : 2,
                 // prestige: i <= 7 && i < length - 1 ? 0 : 1
@@ -200,6 +214,8 @@ export function createPlane(
                         const title = getRandomUpgrade(random);
                         let description = "";
                         let modifier: WithRequired<Modifier, "description" | "invert">;
+                        let previewModifier: WithRequired<Modifier, "invert">;
+                        const currentN = n.value;
                         switch (upgradeType) {
                             case "add": {
                                 const addend = Decimal.add(cost, 10).pow(random() / 4 + 0.875);
@@ -210,6 +226,7 @@ export function createPlane(
                                     description: title,
                                     enabled: upgrade.bought
                                 }));
+                                previewModifier = createAdditiveModifier(() => ({ addend }));
                                 break;
                             }
                             case "mult": {
@@ -218,12 +235,15 @@ export function createPlane(
                                     resource.displayName
                                 } gain by x${format(multiplier)}.`;
                                 costFormula = costFormula.add(
-                                    Decimal.sub(multiplier, 1).times(cachedGain[n.value - 1])
+                                    Decimal.sub(multiplier, 1).times(cachedGain[currentN - 1])
                                 );
                                 modifier = createMultiplicativeModifier(() => ({
                                     multiplier,
                                     description: title,
                                     enabled: upgrade.bought
+                                }));
+                                previewModifier = createMultiplicativeModifier(() => ({
+                                    multiplier
                                 }));
                                 break;
                             }
@@ -233,13 +253,14 @@ export function createPlane(
                                     resource.displayName
                                 } gain to the ^${format(exponent)}`;
                                 costFormula = costFormula
-                                    .add(Decimal.pow(cachedGain[n.value - 1], exponent))
-                                    .sub(cachedGain[n.value - 1]);
+                                    .add(Decimal.pow(cachedGain[currentN - 1], exponent))
+                                    .sub(cachedGain[currentN - 1]);
                                 modifier = createExponentialModifier(() => ({
                                     exponent,
                                     description: title,
                                     enabled: upgrade.bought
                                 }));
+                                previewModifier = createExponentialModifier(() => ({ exponent }));
                             }
                         }
                         cachedGain[n.value] = costFormula.evaluate();
@@ -261,7 +282,8 @@ export function createPlane(
                             canClick: () => upgrade.canPurchase.value,
                             modifier,
                             cost,
-                            showETA: () => !upgrade.bought.value
+                            showETA: () => !upgrade.bought.value,
+                            previewModifier
                         });
                         upgrades.push(upgrade);
                     }
@@ -309,11 +331,14 @@ export function createPlane(
                                     description: title,
                                     enabled: () => Decimal.gt(repeatable.amount.value, 0)
                                 }));
-                                previewModifier = createAdditiveModifier(() => ({ addend }));
+                                previewModifier = createAdditiveModifier(() => ({
+                                    addend: () =>
+                                        Decimal.add(repeatable.amount.value, 1).times(addend)
+                                }));
                                 break;
                             }
                             case "mult": {
-                                const multiplier = random() + 1;
+                                const multiplier = random() * 0.75 + 1.25;
                                 description = `Multiply previous ${
                                     resource.displayName
                                 } gain by x${format(multiplier)}.`;
@@ -325,7 +350,7 @@ export function createPlane(
                                             .times(5)
                                             .pow_base(multiplier)
                                             .sub(1)
-                                            .times(cachedGain[currentN])
+                                            .times(cachedGain[currentN - 1])
                                     )
                                 );
                                 effect = computed(
@@ -340,7 +365,8 @@ export function createPlane(
                                     enabled: () => Decimal.gt(repeatable.amount.value, 0)
                                 }));
                                 previewModifier = createMultiplicativeModifier(() => ({
-                                    multiplier
+                                    multiplier: () =>
+                                        Decimal.add(repeatable.amount.value, 1).pow_base(multiplier)
                                 }));
                                 break;
                             }
@@ -370,6 +396,125 @@ export function createPlane(
                         repeatables.push(repeatable);
                     }
                     features.push(repeatables);
+                    break;
+                case "conversion":
+                    const prestigeResource = createResource(0, getName(random));
+                    const prestigeColor = getColor([0.64, 0.75, 0.55], random);
+                    const cost = nextCost.value;
+                    const costExponent = random() / 2 + 0.25; // Random from 0.25 - 0.75
+                    const effectExponent = random() / 2 + 0.25; // ditto
+                    const currentN = n.value;
+                    costFormula = costFormula.add(
+                        computed(() =>
+                            Decimal.sub(n.value, currentN)
+                                .add(1)
+                                .pow_base(5)
+                                .pow(effectExponent)
+                                .times(cachedGain[currentN - 1])
+                        )
+                    );
+                    const conversion = createCumulativeConversion(() => ({
+                        baseResource: noPersist(resource),
+                        gainResource: prestigeResource,
+                        formula: x => x.div(cost).pow(costExponent),
+                        spend() {
+                            resource.value = 0;
+                        }
+                    }));
+                    cachedGain[n.value] = costFormula.evaluate();
+                    n.value += 2;
+                    const clickableVisibility = visibility;
+                    const title = getRandomUpgrade(random);
+                    const formula = Formula.variable(prestigeResource).pow(effectExponent).add(1);
+                    const modifier = createMultiplicativeModifier(() => ({
+                        multiplier: () => formula.evaluate(),
+                        description: title,
+                        enabled: () => Decimal.gt(prestigeResource.value, 0)
+                    }));
+                    const previewModifier = createMultiplicativeModifier(() => ({
+                        multiplier: () =>
+                            formula.evaluate(
+                                Decimal.add(prestigeResource.value, conversion.actualGain.value)
+                            )
+                    }));
+                    const clickable = createClickable(() => ({
+                        display: {
+                            title,
+                            description: jsx(() => (
+                                <span>
+                                    Reset {resource.displayName} for{" "}
+                                    {displayResource(
+                                        prestigeResource,
+                                        Decimal.clampMin(conversion.actualGain.value, 1)
+                                    )}{" "}
+                                    {prestigeResource.displayName}
+                                    <br />
+                                    <div>
+                                        Next:{" "}
+                                        {displayResource(
+                                            resource,
+                                            Decimal.lt(conversion.actualGain.value, 1)
+                                                ? conversion.currentAt.value
+                                                : conversion.nextAt.value
+                                        )}{" "}
+                                        {resource.displayName}
+                                    </div>
+                                </span>
+                            ))
+                        },
+                        style: {
+                            width: "200px",
+                            minHeight: "100px"
+                        },
+                        canClick: () => Decimal.gte(conversion.actualGain.value, 1),
+                        prestigeResource,
+                        onClick: conversion.convert,
+                        visibility: clickableVisibility
+                    }));
+                    const { isHovering } = prepareFeature({
+                        feature: clickable,
+                        canClick: () => unref(clickable.canClick),
+                        modifier,
+                        cost,
+                        previewCost: resource,
+                        previewModifier
+                    });
+                    const showPreview = computed(
+                        () => isHovering.value && clickable.canClick.value
+                    );
+                    features.push([clickable]);
+                    const resourcePreview = createFormulaPreview(
+                        Formula.variable(prestigeResource),
+                        showPreview,
+                        conversion.actualGain
+                    );
+                    const effectReview = createFormulaPreview(
+                        formula,
+                        showPreview,
+                        conversion.actualGain
+                    );
+                    displays[i * 2] = jsx(() => (
+                        <>
+                            {isVisible(clickable.visibility) ? (
+                                <div style="margin: 10px">
+                                    You have{" "}
+                                    <h2
+                                        style={{
+                                            color: prestigeColor,
+                                            textShadow: `0px 0px 10px ${prestigeColor}`
+                                        }}
+                                    >
+                                        {resourcePreview()}
+                                    </h2>{" "}
+                                    {prestigeResource.displayName},
+                                    <br />
+                                    providing a {effectReview()}x multiplier to previous{" "}
+                                    {resource.displayName} gain
+                                </div>
+                            ) : null}
+                            {renderRow(clickable)}
+                        </>
+                    ));
                     break;
             }
             const treasureWeights = {
@@ -603,10 +748,7 @@ export function createPlane(
         const resourceProductionChange = computed(() => {
             const preview = previews.find(p => p.shouldShowPreview.value);
             if (preview) {
-                return Decimal.sub(
-                    preview.modifier.apply(computedResourceGain.value),
-                    computedResourceGain.value
-                );
+                return Decimal.sub(preview.modifier.apply(0), computedResourceGain.value);
             }
             return 0;
         });
@@ -769,7 +911,9 @@ export function createPlane(
                         </span>
                     </StickyVue>
                     <SpacerVue height="60px" />
-                    {features.map(row => renderRow(...row))}
+                    {features.map((row, i) =>
+                        i in displays ? render(displays[i]) : renderRow(...row)
+                    )}
                     {render(modifiersModal)}
                 </>
             )),
