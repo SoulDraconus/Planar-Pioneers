@@ -2,13 +2,21 @@ import ModalVue from "components/Modal.vue";
 import SpacerVue from "components/layout/Spacer.vue";
 import StickyVue from "components/layout/Sticky.vue";
 import { GenericAchievement, createAchievement } from "features/achievements/achievement";
+import { createBar } from "features/bars/bar";
 import { BoardNode, getUniqueNodeID } from "features/boards/board";
+import { createClickable } from "features/clickables/clickable";
+import { createCumulativeConversion } from "features/conversion";
 import { CoercableComponent, findFeatures, isVisible, jsx } from "features/feature";
 import { GenericRepeatable, RepeatableType, createRepeatable } from "features/repeatable";
 import { createResource, displayResource } from "features/resources/resource";
+import TooltipVue from "features/tooltips/Tooltip.vue";
 import { addTooltip } from "features/tooltips/tooltip";
 import { GenericUpgrade, UpgradeType, createUpgrade } from "features/upgrades/upgrade";
-import Formula, { unrefFormulaSource } from "game/formulas/formulas";
+import Formula, {
+    calculateCost,
+    calculateMaxAffordable,
+    unrefFormulaSource
+} from "game/formulas/formulas";
 import { FormulaSource, GenericFormula } from "game/formulas/types";
 import { BaseLayer, createLayer } from "game/layers";
 import {
@@ -22,12 +30,14 @@ import { State, noPersist, persistent } from "game/persistence";
 import { createCostRequirement } from "game/requirements";
 import { adjectives, colors, uniqueNamesGenerator } from "unique-names-generator";
 import Decimal, { DecimalSource } from "util/bignum";
-import { format } from "util/break_eternity";
+import { format, formatWhole } from "util/break_eternity";
 import { Direction, WithRequired, camelToTitle } from "util/common";
 import { Computable, ProcessedComputable, convertComputable } from "util/computed";
 import { VueFeature, render, renderRow, trackHover } from "util/vue";
 import { ComputedRef, Ref, computed, ref, unref } from "vue";
+import { useToast } from "vue-toastification";
 import { createCollapsibleModifierSections, createFormulaPreview, estimateTime } from "./common";
+import type { PortalState, ResourceState, Resources } from "./projEntry";
 import {
     BoosterState,
     InfluenceState,
@@ -38,13 +48,7 @@ import {
     relics,
     resourceNames
 } from "./projEntry";
-import type { ResourceState, Resources, PortalState } from "./projEntry";
 import { getColor, getName, sfc32 } from "./utils";
-import { useToast } from "vue-toastification";
-import TooltipVue from "features/tooltips/Tooltip.vue";
-import { createConversion, createCumulativeConversion } from "features/conversion";
-import { createClickable } from "features/clickables/clickable";
-import ResourceVue from "features/resources/Resource.vue";
 
 const toast = useToast();
 
@@ -194,8 +198,8 @@ export function createPlane(
             const featureWeights = {
                 upgrades: 32,
                 repeatables: i <= 1 ? 0 : 16,
-                conversion: i <= 3 ? 0 : 8
-                // xp: i <= 5 ? 0 : 4,
+                conversion: i <= 3 ? 0 : 8,
+                xp: i <= 5 ? 0 : 4
                 // dimensions: i <= 7 ? 0 : 2,
                 // prestige: i <= 7 && i < length - 1 ? 0 : 1
             };
@@ -488,7 +492,7 @@ export function createPlane(
                         showPreview,
                         conversion.actualGain
                     );
-                    const effectReview = createFormulaPreview(
+                    const effectPreview = createFormulaPreview(
                         formula,
                         showPreview,
                         conversion.actualGain
@@ -508,7 +512,7 @@ export function createPlane(
                                     </h2>{" "}
                                     {prestigeResource.displayName},
                                     <br />
-                                    providing a {effectReview()}x multiplier to previous{" "}
+                                    providing a {effectPreview()}x multiplier to previous{" "}
                                     {resource.displayName} gain
                                 </div>
                             ) : null}
@@ -516,6 +520,91 @@ export function createPlane(
                         </>
                     ));
                     break;
+                case "xp": {
+                    const xp = createResource<DecimalSource>(0);
+                    const barVisibility = visibility;
+                    const currentN = n.value;
+                    const title = getRandomUpgrade(random);
+                    const cost = Decimal.add(difficulty, random() - 0.5)
+                        .pow_base(2)
+                        .times(10);
+                    const levelDifficulty = random() / 4 + 1.125; // 1.125 - 1.375
+                    const effectExponent = random() / 2 + 1.25; // 1.25 - 1.75
+                    const xpReq = Formula.variable(0).pow(levelDifficulty).times(cost);
+                    const level = calculateMaxAffordable(xpReq, xp, true, 10, Decimal.dInf);
+                    const xpForCurrentLevel = computed(() =>
+                        calculateCost(xpReq, level.value, true, 10)
+                    );
+                    const xpToNextLevel = computed(() =>
+                        calculateCost(xpReq, Decimal.add(level.value, 1), true, 10)
+                    );
+                    const effect = computed(() => Decimal.pow(effectExponent, level.value));
+                    const modifier = createMultiplicativeModifier(() => ({
+                        multiplier: effect,
+                        description: title,
+                        enabled: () => isVisible(bar.visibility)
+                    }));
+                    costFormula = costFormula.add(
+                        computed(() =>
+                            Decimal.sub(n.value, currentN)
+                                .add(1)
+                                .sqrt()
+                                .times(3)
+                                .pow(effectExponent)
+                                .times(cachedGain[currentN - 1])
+                        )
+                    );
+                    cachedGain[n.value] = costFormula.evaluate();
+                    n.value += 2;
+                    const barColor = getColor([0.18, 0.2, 0.25], random);
+                    const bar = createBar(() => ({
+                        direction: Direction.Right,
+                        width: 300,
+                        height: 20,
+                        progress: () =>
+                            Decimal.sub(xp.value, xpForCurrentLevel.value)
+                                .div(Decimal.sub(xpToNextLevel.value, xpForCurrentLevel.value))
+                                .toNumber(),
+                        visibility: barVisibility,
+                        xp,
+                        display: jsx(() => (
+                            <span>
+                                {format(xp.value)}/{format(xpToNextLevel.value)}
+                            </span>
+                        )),
+                        fillStyle: `background-color: ${barColor}`
+                    }));
+                    this.on("preUpdate", diff => {
+                        if (
+                            main.activePortals.value.some(
+                                n => (n.state as unknown as PortalState).id === id
+                            ) &&
+                            isVisible(bar.visibility)
+                        ) {
+                            const totalDiff = Decimal.times(
+                                computedPlanarSpeedModifier.value,
+                                diff
+                            );
+                            xp.value = Decimal.add(totalDiff, xp.value);
+                        }
+                    });
+                    resourceModifiers.push(modifier);
+                    features.push([bar]);
+                    displays[i * 2] = jsx(() => (
+                        <>
+                            {isVisible(bar.visibility) ? (
+                                <div style="margin: 10px">
+                                    You have <h3>{title}</h3> Lv. {formatWhole(level.value)},<br />
+                                    providing a {format(effect.value)}x multiplier to previous{" "}
+                                    {resource.displayName} gain
+                                    <br />
+                                </div>
+                            ) : null}
+                            {renderRow(bar)}
+                        </>
+                    ));
+                    break;
+                }
             }
             const treasureWeights = {
                 cache: "increaseCaches" in influenceState ? 10 : 1,
@@ -576,7 +665,7 @@ export function createPlane(
                     break;
                 case "energyMulti":
                     effectedResource = "energy";
-                    resourceMulti = Decimal.div(rewardsLevel, 17);
+                    resourceMulti = Decimal.div(rewardsLevel, 17).add(1);
                     description = `Gain ${format(resourceMulti)}x energy while plane is active.`;
                     break;
                 case "influences":
