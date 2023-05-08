@@ -543,7 +543,11 @@ export const main = createLayer("main", function (this: BaseLayer) {
             watch(
                 () => resourceLevels.value[resource],
                 (level, prevLevel) => {
-                    if (Decimal.gt(level, prevLevel) && settings.active === player.id) {
+                    if (
+                        Decimal.gt(level, prevLevel) &&
+                        settings.active === player.id &&
+                        Decimal.lte(level, 100)
+                    ) {
                         toast.info(
                             <div>
                                 <h3>
