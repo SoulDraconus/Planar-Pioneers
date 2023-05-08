@@ -37,11 +37,16 @@ import { VueFeature, render, renderRow, trackHover } from "util/vue";
 import { ComputedRef, Ref, computed, ref, unref } from "vue";
 import { useToast } from "vue-toastification";
 import { createCollapsibleModifierSections, createFormulaPreview, estimateTime } from "./common";
-import type { PortalState, ResourceState, Resources } from "./projEntry";
-import {
+import type {
     BoosterState,
     InfluenceState,
     Influences,
+    PortalState,
+    ResourceState,
+    Resources
+} from "./projEntry";
+import {
+    hasWon,
     influences as influenceTypes,
     main,
     mineLootTable,
@@ -702,6 +707,10 @@ export function createPlane(
                 case "relic":
                     description = `Gain the ${tier}-tier planar relic (${relics[tier]})`;
                     onComplete = () => {
+                        if (tier === "ultimatum") {
+                            hasWon.value = true;
+                            return;
+                        }
                         if (!(`${tier}Relic` in main.toolNodes.value)) {
                             const node = {
                                 id: getUniqueNodeID(main.board),

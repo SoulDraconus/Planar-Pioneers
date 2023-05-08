@@ -331,15 +331,9 @@ const passives = {
     },
     beryliumRelic: {
         description: (empowered: boolean) =>
-            empowered
-                ? "(Max tier plane finished)^2 boosts quarry speed"
-                : "Max tier plane finished boosts quarry speed"
-    },
-    unobtainiumRelic: {
-        description: (empowered: boolean) =>
             empowered ? "ln(energy) boosts planar speed" : "log(energy) boosts planar speed"
     },
-    ultimatumRelic: {
+    unobtainiumRelic: {
         description: (empowered: boolean) =>
             empowered
                 ? "Upgrades/repeatables/dimensions/prestige no longer spend on purchase"
@@ -2275,9 +2269,7 @@ export const getInitialLayers = (
 /**
  * A computed ref whose value is true whenever the game is over.
  */
-export const hasWon = computed(() => {
-    return false;
-});
+export const hasWon = ref(false);
 
 /**
  * Given a player save data object being loaded with a different version, update the save data object to match the structure of the current version.
