@@ -212,6 +212,121 @@ export function getName(random: () => number) {
     return camelToTitle(name);
 }
 
+const powerMorphemes = {
+    1: ["a", "e", "i", "o", "u"],
+    2: [
+        "ph",
+        "th",
+        "ch",
+        "sh",
+        "br",
+        "cr",
+        "dr",
+        "fr",
+        "gr",
+        "pr",
+        "tr",
+        "str",
+        "sc",
+        "sk",
+        "sm",
+        "sn",
+        "sp",
+        "st",
+        "sw"
+    ],
+    3: [
+        "ae",
+        "ai",
+        "ao",
+        "au",
+        "ay",
+        "ea",
+        "ei",
+        "eo",
+        "eu",
+        "ey",
+        "ua",
+        "ue",
+        "ui",
+        "uo",
+        "uy",
+        "ia",
+        "ie",
+        "iu",
+        "io",
+        "iy",
+        "oa",
+        "oe",
+        "ou",
+        "oi",
+        "oy"
+    ],
+    4: [
+        "morp",
+        "flux",
+        "syn",
+        "void",
+        "rift",
+        "dyn",
+        "nov",
+        "chron",
+        "lum",
+        "par",
+        "ter",
+        "psy",
+        "phan",
+        "man",
+        "grav",
+        "pyr",
+        "cry",
+        "hydr",
+        "elec",
+        "kin",
+        "nan",
+        "omni"
+    ],
+    5: [
+        "ance",
+        "ation",
+        "esis",
+        "ergy",
+        "tide",
+        "al",
+        "ism",
+        "ity",
+        "mancy",
+        "urgy",
+        "pathy",
+        "port",
+        "shift",
+        "burst",
+        "pulse",
+        "wave",
+        "field",
+        "storm",
+        "force",
+        "blade"
+    ]
+};
+const powerTemplates = [
+    [1, 2, 1, 4, 5],
+    [1, 4, 5],
+    [2, 1, 4, 5],
+    [1, 2, 3, 4, 5],
+    [3, 4, 5]
+] as const;
+
+export function getPowerName(random: () => number) {
+    const template = powerTemplates[Math.floor(random() * powerTemplates.length)];
+    let name = "";
+    for (let i = 0; i < template.length; i++) {
+        const morphemeSet = powerMorphemes[template[i]];
+        name += morphemeSet[Math.floor(random() * morphemeSet.length)];
+    }
+    return camelToTitle(name);
+}
+
 export function getColor(base: [number, number, number], random: () => number) {
     const [h, s, v] = rgb2hsv(...base);
     const [r, g, b] = hsv2rgb(Math.floor(random() * 360), s, v);

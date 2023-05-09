@@ -48,7 +48,6 @@
     "jsdom": "^20.0.0",
     "prettier": "^2.5.1",
     "typescript": "^5.0.2",
-    "unique-names-generator": "^4.7.1",
     "vitest": "^0.29.3",
     "vue-tsc": "^0.38.1"
   },

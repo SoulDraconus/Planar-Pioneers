@@ -28,7 +28,6 @@ import {
 } from "game/modifiers";
 import { State, noPersist, persistent } from "game/persistence";
 import { createCostRequirement } from "game/requirements";
-import { adjectives, colors, uniqueNamesGenerator } from "unique-names-generator";
 import Decimal, { DecimalSource } from "util/bignum";
 import { format, formatWhole } from "util/break_eternity";
 import { Direction, WithRequired, camelToTitle } from "util/common";
@@ -37,7 +36,7 @@ import { VueFeature, render, renderRow, trackHover } from "util/vue";
 import { ComputedRef, Ref, computed, ref, unref } from "vue";
 import { useToast } from "vue-toastification";
 import { createCollapsibleModifierSections, createFormulaPreview, estimateTime } from "./common";
-import { getColor, getName, sfc32 } from "./utils";
+import { getColor, getName, getPowerName, sfc32 } from "./utils";
 import {
     Resources,
     InfluenceState,
@@ -218,7 +217,7 @@ export function createPlane(
                         };
                         const upgradeType = pickRandom(upgradeTypeWeights, random);
                         const cost = nextCost.value;
-                        const title = getRandomUpgrade(random);
+                        const title = getPowerName(random);
                         let description = "";
                         let modifier: WithRequired<Modifier, "description" | "invert">;
                         let previewModifier: WithRequired<Modifier, "invert">;
@@ -309,7 +308,7 @@ export function createPlane(
                         // This will become less accurate the further n gets from when the repeatable showed up, but at that time it should be having an increasingly smaller effect on the overall gain
                         const currentN = n.value;
                         const initialCost = nextCost.value;
-                        const title = getRandomUpgrade(random);
+                        const title = getPowerName(random);
                         let description = "";
                         let effect: ComputedRef<string>;
                         let modifier: WithRequired<Modifier, "description" | "invert">;
@@ -431,7 +430,7 @@ export function createPlane(
                     cachedGain[n.value] = costFormula.evaluate();
                     n.value += 2;
                     const clickableVisibility = visibility;
-                    const title = getRandomUpgrade(random);
+                    const title = getPowerName(random);
                     const formula = Formula.variable(prestigeResource).pow(effectExponent).add(1);
                     const modifier = createMultiplicativeModifier(() => ({
                         multiplier: () => formula.evaluate(),
@@ -527,7 +526,7 @@ export function createPlane(
                     const xp = createResource<DecimalSource>(0);
                     const barVisibility = visibility;
                     const currentN = n.value;
-                    const title = getRandomUpgrade(random);
+                    const title = getPowerName(random);
                     const cost = Decimal.add(difficulty, random() - 0.5)
                         .pow_base(2)
                         .times(10);
@@ -1078,16 +1077,6 @@ function pickRandom<T extends string>(items: Record<T, number>, random: () => nu
         throw new Error("Failed to pick random. This should not happen");
     }
     return result;
-}
-
-function getRandomUpgrade(random: () => number) {
-    return camelToTitle(
-        uniqueNamesGenerator({
-            dictionaries: [colors, adjectives],
-            seed: random() * 4294967296,
-            separator: " "
-        }) + "ity"
-    );
 }
 
 export type GenericPlane = ReturnType<typeof createPlane>;
