@@ -1004,6 +1004,11 @@ export function createPlane(
                             </h3>
                             /s)
                         </span>
+                        {Decimal.neq(computedPlanarSpeedModifier.value, 1) ? (
+                            <span class="nav-segment">
+                                Speed: {format(computedPlanarSpeedModifier.value)}x
+                            </span>
+                        ) : null}
                     </StickyVue>
                     <SpacerVue height="60px" />
                     {features.map((row, i) =>
