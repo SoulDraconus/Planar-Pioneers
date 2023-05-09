@@ -296,12 +296,12 @@ export function onDropPortal(node: BoardNode, otherNode: BoardNode) {
     if (portals.includes(portal)) {
         node.state = {
             ...(node.state as object),
-            tools: portals.filter(r => r !== portal)
+            portals: portals.filter(r => r !== portal)
         };
     } else {
         node.state = {
             ...(node.state as object),
-            tools: [...portals, portal]
+            portals: [...portals, portal]
         };
     }
     main.board.selectedNode.value = node;
