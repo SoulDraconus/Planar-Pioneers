@@ -37,23 +37,21 @@ import { VueFeature, render, renderRow, trackHover } from "util/vue";
 import { ComputedRef, Ref, computed, ref, unref } from "vue";
 import { useToast } from "vue-toastification";
 import { createCollapsibleModifierSections, createFormulaPreview, estimateTime } from "./common";
-import type {
-    BoosterState,
+import { getColor, getName, sfc32 } from "./utils";
+import {
+    Resources,
     InfluenceState,
+    resourceNames,
     Influences,
     PortalState,
     ResourceState,
-    Resources
-} from "./projEntry";
-import {
-    hasWon,
-    influences as influenceTypes,
-    main,
     mineLootTable,
     relics,
-    resourceNames
-} from "./projEntry";
-import { getColor, getName, sfc32 } from "./utils";
+    BoosterState,
+    tools,
+    influences as influenceTypes
+} from "./data";
+import { main, hasWon } from "./projEntry";
 
 const toast = useToast();
 
@@ -108,7 +106,7 @@ export function createPlane(
             createMultiplicativeModifier(() => ({
                 multiplier: () => (main.isEmpowered("silver") ? 4 : 2),
                 description: () =>
-                    (main.isEmpowered("silver") ? "Empowered " : "") + main.tools.silver.name,
+                    (main.isEmpowered("silver") ? "Empowered " : "") + tools.silver.name,
                 enabled: () => main.toolNodes.value.silver != null
             })),
             createMultiplicativeModifier(() => ({
@@ -117,14 +115,14 @@ export function createPlane(
                         upgrades.filter(u => u.bought.value).length) /
                     10,
                 description: () =>
-                    (main.isEmpowered("diamond") ? "Empowered " : "") + main.tools.diamond.name,
+                    (main.isEmpowered("diamond") ? "Empowered " : "") + tools.diamond.name,
                 enabled: () => main.toolNodes.value.diamond != null
             })),
             createMultiplicativeModifier(() => ({
                 multiplier: () =>
                     Decimal.div(timeActive.value, 6000).times(main.isEmpowered("emerald") ? 2 : 1),
                 description: () =>
-                    (main.isEmpowered("emerald") ? "Empowered " : "") + main.tools.emerald.name,
+                    (main.isEmpowered("emerald") ? "Empowered " : "") + tools.emerald.name,
                 enabled: () => main.toolNodes.value.emerald != null
             }))
         ]);
