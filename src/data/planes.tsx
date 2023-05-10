@@ -8,6 +8,7 @@ import { createClickable } from "features/clickables/clickable";
 import { createCumulativeConversion } from "features/conversion";
 import { CoercableComponent, findFeatures, isVisible, jsx } from "features/feature";
 import { GenericRepeatable, RepeatableType, createRepeatable } from "features/repeatable";
+import { createReset } from "features/reset";
 import { Resource, createResource, displayResource } from "features/resources/resource";
 import TooltipVue from "features/tooltips/Tooltip.vue";
 import { addTooltip } from "features/tooltips/tooltip";
@@ -28,7 +29,7 @@ import {
 } from "game/modifiers";
 import { State, noPersist, persistent } from "game/persistence";
 import { createCostRequirement } from "game/requirements";
-import Decimal, { DecimalSource, formatSmall } from "util/bignum";
+import Decimal, { DecimalSource } from "util/bignum";
 import { format, formatWhole } from "util/break_eternity";
 import { Direction, WithRequired, camelToTitle } from "util/common";
 import { Computable, ProcessedComputable, convertComputable } from "util/computed";
@@ -36,21 +37,21 @@ import { VueFeature, render, renderCol, renderRow, trackHover } from "util/vue";
 import { ComputedRef, Ref, computed, ref, unref } from "vue";
 import { useToast } from "vue-toastification";
 import { createCollapsibleModifierSections, createFormulaPreview, estimateTime } from "./common";
-import { getColor, getName, getPowerName, sfc32 } from "./utils";
 import {
-    Resources,
+    BoosterState,
     InfluenceState,
-    resourceNames,
     Influences,
     PortalState,
     ResourceState,
+    Resources,
+    influences as influenceTypes,
     mineLootTable,
     relics,
-    BoosterState,
-    tools,
-    influences as influenceTypes
+    resourceNames,
+    tools
 } from "./data";
-import { main, hasWon } from "./projEntry";
+import { hasWon, main } from "./projEntry";
+import { getColor, getName, getPowerName, sfc32 } from "./utils";
 
 const toast = useToast();
 
@@ -207,8 +208,8 @@ export function createPlane(
                 repeatables: i <= 1 ? 0 : 16,
                 conversion: i <= 3 ? 0 : 8,
                 xp: i <= 5 ? 0 : 4,
-                dimensions: i <= 7 ? 0 : 2
-                // prestige: i <= 7 && i < length - 1 ? 0 : 1
+                dimensions: i <= 7 ? 0 : 2,
+                prestige: i <= 7 || i >= length - 1 ? 0 : 1
             };
             const type = pickRandom(featureWeights, random);
             switch (type) {
@@ -259,7 +260,7 @@ export function createPlane(
                                 break;
                             }
                             case "pow": {
-                                const exponent = random() / 5 + 1.1;
+                                const exponent = random() / 10 + 1.05;
                                 description = `Raise previous ${
                                     resource.displayName
                                 } gain to the ^${format(exponent)}`;
@@ -777,6 +778,58 @@ export function createPlane(
                             {renderCol(...clickables)}
                         </>
                     ));
+                    break;
+                }
+                case "prestige": {
+                    const title = getPowerName(random);
+                    const upgradeVisibility = visibility;
+                    const effectExponent = random() / 2 + 1.25; // 1.25 - 1.75
+                    const cost = nextCost.value;
+                    costFormula = costFormula.pow(effectExponent);
+                    const modifier = createExponentialModifier(() => ({
+                        exponent: effectExponent,
+                        description: title,
+                        enabled: upgrade.bought
+                    }));
+                    cachedGain[n.value] = costFormula.evaluate();
+                    n.value++;
+                    const reset = createReset(() => ({
+                        thingsToReset: features.filter((f, i) => i % 2 === 0),
+                        onReset() {
+                            resource.value = 0;
+                        }
+                    }));
+                    const upgrade = createUpgrade(() => ({
+                        display: {
+                            title,
+                            description: `Reset all previous ${name} content to raise all previous ${
+                                resource.displayName
+                            } gain to the ^${format(effectExponent)}`
+                        },
+                        style: {
+                            width: "200px",
+                            minHeight: "100px"
+                        },
+                        onPurchase: reset.reset,
+                        visibility: upgradeVisibility,
+                        requirements: createCostRequirement(() => ({
+                            resource: noPersist(resource),
+                            cost
+                        }))
+                    }));
+                    const previewModifier = createMultiplicativeModifier(() => ({
+                        multiplier: 0
+                    }));
+                    prepareFeature({
+                        feature: upgrade,
+                        canClick: () => unref(upgrade.canPurchase),
+                        modifier,
+                        cost,
+                        previewCost: resource,
+                        previewModifier,
+                        showETA: () => !unref(upgrade.bought)
+                    });
+                    features.push([upgrade]);
                     break;
                 }
             }
