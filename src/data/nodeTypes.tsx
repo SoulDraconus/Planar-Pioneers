@@ -40,6 +40,7 @@ import {
     QuarryState,
     ResourceState,
     Resources,
+    UpgraderState,
     increaseBoostFormula,
     influences,
     passives,
@@ -526,7 +527,13 @@ export const portal = {
     classes: node => ({
         running: isPowered(node),
         showNotif: (layers[(node.state as unknown as PortalState).id] as GenericPlane).showNotif
-            .value
+            .value,
+        "affected-node":
+            main.booster.value != null &&
+            isPowered(main.booster.value) &&
+            (main.booster.value.state as unknown as BoosterState).portals.includes(
+                (node.state as unknown as PortalState).id
+            )
     }),
     outlineColor: node =>
         (layers[(node.state as unknown as PortalState).id] as GenericPlane).background,
@@ -611,8 +618,10 @@ export const booster = {
                         ? "Booster - Drag a portal to me!"
                         : `Boosting by ${formatWhole(
                               Decimal.add(1, (node.state as unknown as BoosterState).level)
-                          )}x (${(node.state as { tools: Passives[] }).tools.length}/${Decimal.add(
-                              (node.state as { maxConnections: number }).maxConnections,
+                          )}x (${
+                              (node.state as unknown as BoosterState).portals.length
+                          }/${Decimal.add(
+                              (node.state as unknown as BoosterState).maxConnections,
                               main.computedBonusConnectionsModifier.value
                           )})`
             };
@@ -670,6 +679,55 @@ export const booster = {
                 main.board.selectedAction.value = null;
             }
         },
+        togglePoweredAction
+    ],
+    canAccept: canAcceptPortal,
+    onDrop: onDropPortal,
+    classes: node => ({
+        running: isPowered(node)
+    }),
+    draggable: true
+} as NodeTypeOptions;
+
+export const upgrader = {
+    shape: Shape.Diamond,
+    size: 50,
+    title: "🤖",
+    label: node => {
+        if (node === main.board.selectedNode.value) {
+            return {
+                text:
+                    (node.state as unknown as UpgraderState).portals.length === 0
+                        ? "Upgrader - Drag a portal to me!"
+                        : `Auto-Upgrading (${
+                              (node.state as unknown as UpgraderState).portals.length
+                          }/${Decimal.add(
+                              (node.state as unknown as UpgraderState).maxConnections,
+                              main.computedBonusConnectionsModifier.value
+                          )})`
+            };
+        }
+        return labelForAcceptingPortal(node, portal => {
+            return `Auto-buy ${(layers[portal] as GenericPlane).name}'s upgrades`;
+        });
+    },
+    actionDistance: Math.PI / 4,
+    actions: [
+        {
+            id: "deselect",
+            icon: "close",
+            tooltip: {
+                text: "Disconnect portals"
+            },
+            onClick(node: BoardNode) {
+                node.state = { ...(node.state as object), portals: [] };
+                main.board.selectedAction.value = null;
+                main.board.selectedNode.value = null;
+            },
+            visibility: (node: BoardNode) =>
+                (node.state as unknown as UpgraderState)?.portals.length ?? 0 > 0
+        },
+        getIncreaseConnectionsAction(x => x.add(4).pow_base(1e6)),
         togglePoweredAction
     ],
     canAccept: canAcceptPortal,

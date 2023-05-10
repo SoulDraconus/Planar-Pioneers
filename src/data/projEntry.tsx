@@ -49,6 +49,7 @@ import {
     QuarryState,
     ResourceState,
     Resources,
+    UpgraderState,
     mineLootTable,
     resourceNames,
     tools
@@ -66,7 +67,8 @@ import {
     portal,
     portalGenerator,
     quarry,
-    resource
+    resource,
+    upgrader
 } from "./nodeTypes";
 import { GenericPlane, createPlane } from "./planes";
 
@@ -84,7 +86,8 @@ const types = {
     portalGenerator,
     portal,
     influence,
-    booster
+    booster,
+    upgrader
 };
 
 /**
@@ -109,7 +112,8 @@ export const main = createLayer("main", function (this: BaseLayer) {
         wood: board.types.quarry.nodes.value[0],
         coal: board.types.empowerer.nodes.value[0],
         iron: board.types.portalGenerator.nodes.value[0],
-        gold: board.types.booster.nodes.value[0]
+        gold: board.types.booster.nodes.value[0],
+        platinum: board.types.upgrader.nodes.value[0]
     }));
 
     const influenceNodes: ComputedRef<Record<Influences, BoardNode>> = computed(() => ({
@@ -343,6 +347,20 @@ export const main = createLayer("main", function (this: BaseLayer) {
                     });
                 });
             }
+            if (upgrader.value != null) {
+                (upgrader.value.state as unknown as UpgraderState).portals.forEach(portal => {
+                    links.push({
+                        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                        startNode: upgrader.value!,
+                        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                        endNode: (board as GenericBoard).types.portal.nodes.value.find(
+                            node => (node.state as unknown as PortalState).id === portal
+                        )!,
+                        stroke: "var(--foreground)",
+                        strokeWidth: 4
+                    });
+                });
+            }
             Object.values(influenceNodes.value).forEach(node => {
                 const state = node.state as unknown as InfluenceState;
                 if (state.type === "increaseResources" || state.type === "decreaseResources") {
@@ -371,7 +389,8 @@ export const main = createLayer("main", function (this: BaseLayer) {
         () => toolNodes.value.iron
     );
     const booster: ComputedRef<BoardNode | undefined> = computed(() => toolNodes.value.gold);
-    const poweredMachines = [mine, dowsing, quarry, empowerer, booster];
+    const upgrader: ComputedRef<BoardNode | undefined> = computed(() => toolNodes.value.platinum);
+    const poweredMachines = [mine, dowsing, quarry, empowerer, booster, upgrader];
 
     function grantResource(type: Resources, amount: DecimalSource) {
         let node = resourceNodes.value[type];
@@ -780,6 +799,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
             checkConnections(curr, quarry, "resources");
             checkConnections(curr, empowerer, "tools");
             checkConnections(curr, booster, "portals");
+            checkConnections(curr, upgrader, "portals");
         }
     });
 
@@ -800,6 +820,8 @@ export const main = createLayer("main", function (this: BaseLayer) {
         dropRates,
         dowsing,
         empowerer,
+        booster,
+        upgrader,
         resourceLevels,
         planarMultis,
         display: jsx(() => (

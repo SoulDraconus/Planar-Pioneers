@@ -12,14 +12,19 @@ import { createReset } from "features/reset";
 import { Resource, createResource, displayResource } from "features/resources/resource";
 import TooltipVue from "features/tooltips/Tooltip.vue";
 import { addTooltip } from "features/tooltips/tooltip";
-import { GenericUpgrade, UpgradeType, createUpgrade } from "features/upgrades/upgrade";
+import {
+    GenericUpgrade,
+    UpgradeType,
+    createUpgrade,
+    setupAutoPurchase
+} from "features/upgrades/upgrade";
 import Formula, {
     calculateCost,
     calculateMaxAffordable,
     unrefFormulaSource
 } from "game/formulas/formulas";
 import { FormulaSource, GenericFormula, InvertibleIntegralFormula } from "game/formulas/types";
-import { BaseLayer, createLayer } from "game/layers";
+import { BaseLayer, GenericLayer, createLayer } from "game/layers";
 import {
     Modifier,
     createAdditiveModifier,
@@ -29,13 +34,13 @@ import {
 } from "game/modifiers";
 import { State, noPersist, persistent } from "game/persistence";
 import { createCostRequirement } from "game/requirements";
-import Decimal, { DecimalSource } from "util/bignum";
-import { format, formatWhole } from "util/break_eternity";
+import Decimal, { format, formatWhole, DecimalSource } from "util/bignum";
 import { Direction, WithRequired, camelToTitle } from "util/common";
 import { Computable, ProcessedComputable, convertComputable } from "util/computed";
 import { VueFeature, render, renderCol, renderRow, trackHover } from "util/vue";
 import { ComputedRef, Ref, computed, ref, unref } from "vue";
 import { useToast } from "vue-toastification";
+import { isPowered } from "./boardUtils";
 import { createCollapsibleModifierSections, createFormulaPreview, estimateTime } from "./common";
 import {
     BoosterState,
@@ -1064,6 +1069,12 @@ export function createPlane(
                 treasure.update?.(totalDiff);
             });
         });
+
+        setupAutoPurchase(
+            this as GenericLayer,
+            () => main.upgrader.value != null && isPowered(main.upgrader.value),
+            upgrades
+        );
 
         const resourceChange = computed(() => {
             const preview = previews.find(p => p.shouldShowPreview.value);
