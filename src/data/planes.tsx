@@ -8,7 +8,7 @@ import { createClickable } from "features/clickables/clickable";
 import { createCumulativeConversion } from "features/conversion";
 import { CoercableComponent, findFeatures, isVisible, jsx } from "features/feature";
 import { GenericRepeatable, RepeatableType, createRepeatable } from "features/repeatable";
-import { createResource, displayResource } from "features/resources/resource";
+import { Resource, createResource, displayResource } from "features/resources/resource";
 import TooltipVue from "features/tooltips/Tooltip.vue";
 import { addTooltip } from "features/tooltips/tooltip";
 import { GenericUpgrade, UpgradeType, createUpgrade } from "features/upgrades/upgrade";
@@ -17,7 +17,7 @@ import Formula, {
     calculateMaxAffordable,
     unrefFormulaSource
 } from "game/formulas/formulas";
-import { FormulaSource, GenericFormula } from "game/formulas/types";
+import { FormulaSource, GenericFormula, InvertibleIntegralFormula } from "game/formulas/types";
 import { BaseLayer, createLayer } from "game/layers";
 import {
     Modifier,
@@ -28,11 +28,11 @@ import {
 } from "game/modifiers";
 import { State, noPersist, persistent } from "game/persistence";
 import { createCostRequirement } from "game/requirements";
-import Decimal, { DecimalSource } from "util/bignum";
+import Decimal, { DecimalSource, formatSmall } from "util/bignum";
 import { format, formatWhole } from "util/break_eternity";
 import { Direction, WithRequired, camelToTitle } from "util/common";
 import { Computable, ProcessedComputable, convertComputable } from "util/computed";
-import { VueFeature, render, renderRow, trackHover } from "util/vue";
+import { VueFeature, render, renderCol, renderRow, trackHover } from "util/vue";
 import { ComputedRef, Ref, computed, ref, unref } from "vue";
 import { useToast } from "vue-toastification";
 import { createCollapsibleModifierSections, createFormulaPreview, estimateTime } from "./common";
@@ -59,6 +59,11 @@ export type Treasure = GenericAchievement & {
     link?: ComputedRef<BoardNode>;
     effectedResource?: Resources | "energy";
     resourceMulti: DecimalSource;
+};
+
+export type Dimension = GenericRepeatable & {
+    effect: InvertibleIntegralFormula;
+    dimensions: Resource;
 };
 
 export function createPlane(
@@ -129,7 +134,7 @@ export function createPlane(
 
         const previews: {
             shouldShowPreview: Ref<boolean>;
-            modifier: Modifier;
+            modifier?: Modifier;
             cost: FormulaSource;
         }[] = [];
         const displays: Record<number, CoercableComponent> = {};
@@ -201,8 +206,8 @@ export function createPlane(
                 upgrades: 32,
                 repeatables: i <= 1 ? 0 : 16,
                 conversion: i <= 3 ? 0 : 8,
-                xp: i <= 5 ? 0 : 4
-                // dimensions: i <= 7 ? 0 : 2,
+                xp: i <= 5 ? 0 : 4,
+                dimensions: i <= 7 ? 0 : 2
                 // prestige: i <= 7 && i < length - 1 ? 0 : 1
             };
             const type = pickRandom(featureWeights, random);
@@ -607,6 +612,173 @@ export function createPlane(
                     ));
                     break;
                 }
+                case "dimensions": {
+                    const title = getPowerName(random);
+                    const energy = createResource<DecimalSource>(0, title + " energy");
+                    const energyColor = getColor([0.64, 0.75, 0.55], random);
+                    const currentN = n.value;
+                    costFormula = costFormula.add(
+                        computed(() =>
+                            Decimal.sub(n.value, currentN)
+                                .add(1)
+                                .pow_base(32)
+                                .add(1)
+                                .log2()
+                                .add(1)
+                                .times(cachedGain[currentN - 1])
+                        )
+                    );
+                    const effect = computed(() => Decimal.add(energy.value, 1).log2().add(1));
+                    const modifier = createMultiplicativeModifier(() => ({
+                        multiplier: effect,
+                        description: title,
+                        enabled: () => Decimal.gt(energy.value, 0)
+                    }));
+                    resourceModifiers.push(modifier);
+                    const repeatableVisibility = visibility;
+                    const clickables: Dimension[] = [];
+                    for (let j = 0; j < 4; j++) {
+                        const baseGain = Decimal.add(difficulty, random() - 0.5)
+                            .pow_base(2)
+                            .times(10)
+                            .recip();
+                        const initialCost = nextCost.value;
+                        const clickableAmountVariable = Formula.variable(
+                            computed(() => clickable.amount.value)
+                        );
+                        const cost = clickableAmountVariable
+                            .pow_base(Decimal.pow10(j + 1))
+                            .times(initialCost);
+                        const dimensionTitle =
+                            ["First", "Second", "Third", "Fourth"][j] + " " + title + " Dimension";
+                        const dimensions = createResource<DecimalSource>(0, dimensionTitle);
+                        const effect = clickableAmountVariable
+                            .sub(1)
+                            .pow_base(2)
+                            .times(baseGain)
+                            .times(
+                                computed(() =>
+                                    Decimal.add(clickable.amount.value, dimensions.value)
+                                )
+                            );
+                        const clickable: Dimension = createRepeatable(() => ({
+                            display: {
+                                title: dimensionTitle,
+                                description: jsx(() => (
+                                    <div>
+                                        <div>
+                                            Amount:{" "}
+                                            {format(
+                                                Decimal.add(
+                                                    dimensions.value,
+                                                    clickable.amount.value
+                                                )
+                                            )}{" "}
+                                            [{formatWhole(clickable.amount.value)}]
+                                        </div>
+                                    </div>
+                                )),
+                                effectDisplay: jsx(() => (
+                                    <span>
+                                        {preview()}{" "}
+                                        {j === 0
+                                            ? energy.displayName
+                                            : // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                              (clickables[clickables.length - 1] as any).display
+                                                  .title}
+                                        /s
+                                    </span>
+                                )),
+                                showAmount: false
+                            },
+                            style: {
+                                width: "400px"
+                            },
+                            effect,
+                            dimensions,
+                            energy: j === 0 ? energy : undefined,
+                            requirements: createCostRequirement(() => ({
+                                resource: noPersist(resource),
+                                cost
+                            })),
+                            visibility: repeatableVisibility
+                        }));
+                        clickables.push(clickable);
+                        const isHovering = trackHover(clickable);
+                        const shouldShowPreview = computed(
+                            () => unref(clickable.canClick) && isHovering.value
+                        );
+                        const previewFormula = new Formula({
+                            inputs: [clickableAmountVariable],
+                            evaluate(clickableAmount) {
+                                return Decimal.sub(clickableAmount, 1)
+                                    .pow_base(2)
+                                    .times(baseGain)
+                                    .times(Decimal.add(clickableAmount, dimensions.value));
+                            }
+                        });
+                        const preview = createFormulaPreview(previewFormula, shouldShowPreview);
+                        previews.push({
+                            shouldShowPreview,
+                            cost
+                        });
+                        const eta = estimateTime(resource, computedResourceGain, () =>
+                            unrefFormulaSource(cost)
+                        );
+                        addTooltip(clickable, {
+                            display: eta,
+                            direction: Direction.Down
+                        });
+                        cachedGain[n.value] = costFormula.evaluate();
+                        n.value++;
+                    }
+                    this.on("preUpdate", diff => {
+                        if (
+                            main.activePortals.value.some(
+                                n => (n.state as unknown as PortalState).id === id
+                            ) &&
+                            isVisible(repeatableVisibility)
+                        ) {
+                            const totalDiff = Decimal.times(
+                                computedPlanarSpeedModifier.value,
+                                diff
+                            );
+                            const gain = clickables[0].effect.evaluate();
+                            energy.value = Decimal.times(gain, totalDiff).add(energy.value);
+                            for (let i = 1; i < 4; i++) {
+                                const gain = clickables[i].effect.evaluate();
+                                clickables[i - 1].dimensions.value = Decimal.times(
+                                    gain,
+                                    totalDiff
+                                ).add(clickables[i - 1].dimensions.value);
+                            }
+                        }
+                    });
+                    features.push(clickables);
+                    displays[i * 2] = jsx(() => (
+                        <>
+                            {isVisible(repeatableVisibility) ? (
+                                <div style="margin: 10px">
+                                    You have{" "}
+                                    <h2
+                                        style={{
+                                            color: energyColor,
+                                            textShadow: `0px 0px 10px ${energyColor}`
+                                        }}
+                                    >
+                                        {format(energy.value)}
+                                    </h2>{" "}
+                                    {energy.displayName},
+                                    <br />
+                                    providing a {format(effect.value)}x multiplier to previous{" "}
+                                    {resource.displayName} gain
+                                </div>
+                            ) : null}
+                            {renderCol(...clickables)}
+                        </>
+                    ));
+                    break;
+                }
             }
             const treasureWeights = {
                 cache: "increaseCaches" in influenceState ? 10 : 1,
@@ -842,7 +1014,7 @@ export function createPlane(
         });
         const resourceProductionChange = computed(() => {
             const preview = previews.find(p => p.shouldShowPreview.value);
-            if (preview) {
+            if (preview && preview.modifier) {
                 return Decimal.sub(preview.modifier.apply(0), computedResourceGain.value);
             }
             return 0;
