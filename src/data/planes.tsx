@@ -584,6 +584,7 @@ export function createPlane(
                     }));
                     this.on("preUpdate", diff => {
                         if (
+                            earnedTreasures.value.length < length &&
                             main.activePortals.value.some(
                                 n => (n.state as unknown as PortalState).id === id
                             ) &&
@@ -735,6 +736,7 @@ export function createPlane(
                     }
                     this.on("preUpdate", diff => {
                         if (
+                            earnedTreasures.value.length < length &&
                             main.activePortals.value.some(
                                 n => (n.state as unknown as PortalState).id === id
                             ) &&
@@ -1052,9 +1054,11 @@ export function createPlane(
             const totalDiff = Decimal.times(computedPlanarSpeedModifier.value, diff);
 
             timeActive.value = Decimal.add(timeActive.value, totalDiff);
-            resource.value = Decimal.times(computedResourceGain.value, totalDiff).add(
-                resource.value
-            );
+            if (earnedTreasures.value.length < length) {
+                resource.value = Decimal.times(computedResourceGain.value, totalDiff).add(
+                    resource.value
+                );
+            }
 
             earnedTreasures.value.forEach(treasure => {
                 treasure.update?.(totalDiff);
