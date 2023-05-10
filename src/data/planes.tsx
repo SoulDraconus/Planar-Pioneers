@@ -694,9 +694,10 @@ export function createPlane(
                                         {preview()}{" "}
                                         {j === 0
                                             ? energy.displayName
-                                            : // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                              (clickables[clickables.length - 1] as any).display
-                                                  .title}
+                                            : ["First", "Second", "Third", "Fourth"][j - 1] +
+                                              " " +
+                                              title +
+                                              " Dimension"}
                                         /s
                                     </span>
                                 )),
