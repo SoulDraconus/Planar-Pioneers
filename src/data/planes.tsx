@@ -1254,9 +1254,17 @@ export function createPlane(
                         ) : null}
                     </StickyVue>
                     <SpacerVue height="60px" />
-                    {features.map((row, i) =>
-                        i in displays ? render(displays[i]) : renderRow(...row)
-                    )}
+                    {features
+                        .slice(
+                            0,
+                            features.findIndex(
+                                (row, i) =>
+                                    i > 0 &&
+                                    i % 2 === 0 &&
+                                    !(features[i - 1][0] as Treasure).earned.value
+                            )
+                        )
+                        .map((row, i) => (i in displays ? render(displays[i]) : renderRow(...row)))}
                     {render(modifiersModal)}
                 </>
             )),
