@@ -874,7 +874,10 @@ export function createPlane(
                     };
                     break;
                 case "relic":
-                    description = `Gain the ${tier}-tier planar relic (${relics[tier]})`;
+                    description =
+                        tier === "ultimatum"
+                            ? "Win the game!"
+                            : `Gain the ${tier}-tier planar relic (${relics[tier]})`;
                     onComplete = () => {
                         if (tier === "ultimatum") {
                             hasWon.value = true;
