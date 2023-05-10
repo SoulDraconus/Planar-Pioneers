@@ -4,7 +4,7 @@ import StickyVue from "components/layout/Sticky.vue";
 import { GenericAchievement, createAchievement } from "features/achievements/achievement";
 import { createBar } from "features/bars/bar";
 import { BoardNode, getUniqueNodeID } from "features/boards/board";
-import { createClickable } from "features/clickables/clickable";
+import { GenericClickable, createClickable, setupAutoClick } from "features/clickables/clickable";
 import { createCumulativeConversion } from "features/conversion";
 import { CoercableComponent, findFeatures, isVisible, jsx } from "features/feature";
 import { GenericRepeatable, RepeatableType, createRepeatable } from "features/repeatable";
@@ -43,12 +43,14 @@ import { useToast } from "vue-toastification";
 import { isPowered } from "./boardUtils";
 import { createCollapsibleModifierSections, createFormulaPreview, estimateTime } from "./common";
 import {
+    AutomatorState,
     BoosterState,
     InfluenceState,
     Influences,
     PortalState,
     ResourceState,
     Resources,
+    UpgraderState,
     influences as influenceTypes,
     mineLootTable,
     relics,
@@ -130,7 +132,9 @@ export function createPlane(
             })),
             createMultiplicativeModifier(() => ({
                 multiplier: () =>
-                    Decimal.div(timeActive.value, 6000).times(main.isEmpowered("emerald") ? 2 : 1),
+                    Decimal.div(timeActive.value, 6000)
+                        .times(main.isEmpowered("emerald") ? 2 : 1)
+                        .add(1),
                 description: () =>
                     (main.isEmpowered("emerald") ? "Empowered " : "") + tools.emerald.name,
                 enabled: () => main.toolNodes.value.emerald != null
@@ -1072,8 +1076,22 @@ export function createPlane(
 
         setupAutoPurchase(
             this as GenericLayer,
-            () => main.upgrader.value != null && isPowered(main.upgrader.value),
+            () =>
+                earnedTreasures.value.length < length &&
+                main.upgrader.value != null &&
+                isPowered(main.upgrader.value) &&
+                (main.upgrader.value.state as unknown as UpgraderState).portals.includes(id),
             upgrades
+        );
+
+        setupAutoClick(
+            this as GenericLayer,
+            () =>
+                earnedTreasures.value.length < length &&
+                main.automator.value != null &&
+                isPowered(main.automator.value) &&
+                (main.automator.value.state as unknown as AutomatorState).portals.includes(id),
+            repeatables as unknown as GenericClickable[]
         );
 
         const resourceChange = computed(() => {
@@ -1174,6 +1192,21 @@ export function createPlane(
                 )
         );
 
+        const renderableFeatures = computed(() => {
+            const lastIndex = features.findIndex(
+                (row, i) => i > 0 && i % 2 === 0 && !(features[i - 1][0] as Treasure).earned.value
+            );
+            let featuresToRender;
+            if (lastIndex === -1) {
+                featuresToRender = features;
+            } else {
+                featuresToRender = features.slice(0, lastIndex);
+            }
+            return featuresToRender.map((row, i) =>
+                i in displays ? render(displays[i]) : renderRow(...row)
+            );
+        });
+
         return {
             tier: persistent(tier),
             seed: persistent(seed),
@@ -1254,17 +1287,7 @@ export function createPlane(
                         ) : null}
                     </StickyVue>
                     <SpacerVue height="60px" />
-                    {features
-                        .slice(
-                            0,
-                            features.findIndex(
-                                (row, i) =>
-                                    i > 0 &&
-                                    i % 2 === 0 &&
-                                    !(features[i - 1][0] as Treasure).earned.value
-                            )
-                        )
-                        .map((row, i) => (i in displays ? render(displays[i]) : renderRow(...row)))}
+                    {renderableFeatures.value}
                     {render(modifiersModal)}
                 </>
             )),

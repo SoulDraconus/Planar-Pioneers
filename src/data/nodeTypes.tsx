@@ -29,6 +29,7 @@ import {
     togglePoweredAction
 } from "./boardUtils";
 import {
+    AutomatorState,
     BoosterState,
     DowsingState,
     EmpowererState,
@@ -239,7 +240,13 @@ export const resource = {
 export const passive = {
     shape: Shape.Circle,
     size: 50,
-    title: node => tools[node.state as Resources].name,
+    title: node => {
+        const passive = node.state as Passives;
+        if (passive.includes("Relic")) {
+            return relics[passive.slice(0, -5) as Resources];
+        }
+        return tools[passive as Resources].name;
+    },
     label: node =>
         node === main.board.selectedNode.value
             ? {
@@ -708,7 +715,7 @@ export const upgrader = {
             };
         }
         return labelForAcceptingPortal(node, portal => {
-            return `Auto-buy ${(layers[portal] as GenericPlane).name}'s upgrades`;
+            return `Auto-buy ${(layers[portal] as GenericPlane).name}'s upgrades and prestiges`;
         });
     },
     actionDistance: Math.PI / 4,
@@ -726,6 +733,55 @@ export const upgrader = {
             },
             visibility: (node: BoardNode) =>
                 (node.state as unknown as UpgraderState)?.portals.length ?? 0 > 0
+        },
+        getIncreaseConnectionsAction(x => x.add(4).pow_base(1e6)),
+        togglePoweredAction
+    ],
+    canAccept: canAcceptPortal,
+    onDrop: onDropPortal,
+    classes: node => ({
+        running: isPowered(node)
+    }),
+    draggable: true
+} as NodeTypeOptions;
+
+export const automator = {
+    shape: Shape.Diamond,
+    size: 50,
+    title: "🦾",
+    label: node => {
+        if (node === main.board.selectedNode.value) {
+            return {
+                text:
+                    (node.state as unknown as AutomatorState).portals.length === 0
+                        ? "Automator - Drag a portal to me!"
+                        : `Automatating (${
+                              (node.state as unknown as AutomatorState).portals.length
+                          }/${Decimal.add(
+                              (node.state as unknown as AutomatorState).maxConnections,
+                              main.computedBonusConnectionsModifier.value
+                          )})`
+            };
+        }
+        return labelForAcceptingPortal(node, portal => {
+            return `Auto-buy ${(layers[portal] as GenericPlane).name}'s repeatables and dimensions`;
+        });
+    },
+    actionDistance: Math.PI / 4,
+    actions: [
+        {
+            id: "deselect",
+            icon: "close",
+            tooltip: {
+                text: "Disconnect portals"
+            },
+            onClick(node: BoardNode) {
+                node.state = { ...(node.state as object), portals: [] };
+                main.board.selectedAction.value = null;
+                main.board.selectedNode.value = null;
+            },
+            visibility: (node: BoardNode) =>
+                (node.state as unknown as AutomatorState)?.portals.length ?? 0 > 0
         },
         getIncreaseConnectionsAction(x => x.add(4).pow_base(1e6)),
         togglePoweredAction

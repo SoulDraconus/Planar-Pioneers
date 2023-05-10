@@ -56,6 +56,12 @@ export interface UpgraderState {
     powered: boolean;
 }
 
+export interface AutomatorState {
+    portals: string[];
+    maxConnections: number;
+    powered: boolean;
+}
+
 export const mineLootTable = {
     dirt: 120,
     sand: 60,
@@ -224,8 +230,8 @@ export const passives = {
     silver: {
         description: (empowered: boolean) =>
             empowered
-                ? "Doubles each plane's resource gain"
-                : "Quadruples each plane's resource gain"
+                ? "Quadruples each plane's resource gain"
+                : "Doubles each plane's resource gain"
     },
     diamond: {
         description: (empowered: boolean) =>

@@ -347,7 +347,7 @@ export function checkConnections<T extends string>(
         };
         const currentConnections = state[connectionsName];
         const maxConnections = state.maxConnections;
-        if (Decimal.lt(currentConnections.length, Decimal.add(maxConnections, bonusConnections))) {
+        if (Decimal.gt(currentConnections.length, Decimal.add(maxConnections, bonusConnections))) {
             node.value.state = {
                 ...(node.value.state as object),
                 [connectionsName]: currentConnections.slice(

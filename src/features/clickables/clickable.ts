@@ -1,14 +1,15 @@
 import ClickableComponent from "features/clickables/Clickable.vue";
 import { GenericDecorator } from "features/decorators/common";
-import type {
+import {
     CoercableComponent,
     GenericComponent,
     OptionsFunc,
     Replace,
-    StyleValue
+    StyleValue,
+    findFeatures
 } from "features/feature";
 import { Component, GatherProps, Visibility, getUniqueID, setDefault } from "features/feature";
-import type { BaseLayer } from "game/layers";
+import type { BaseLayer, GenericLayer } from "game/layers";
 import type { Unsubscribe } from "nanoevents";
 import type {
     Computable,
@@ -190,15 +191,19 @@ export function createClickable<T extends ClickableOptions>(
  * @param autoActive Whether or not the clickable should currently be auto-clicking
  */
 export function setupAutoClick(
-    layer: BaseLayer,
-    clickable: GenericClickable,
-    autoActive: Computable<boolean> = true
+    layer: GenericLayer,
+    autoActive: Computable<boolean>,
+    clickables: GenericClickable[] = []
 ): Unsubscribe {
+    clickables =
+        clickables.length === 0
+            ? (findFeatures(layer, ClickableType) as GenericClickable[])
+            : clickables;
     const isActive: ProcessedComputable<boolean> =
         typeof autoActive === "function" ? computed(autoActive) : autoActive;
     return layer.on("update", () => {
-        if (unref(isActive) && unref(clickable.canClick)) {
-            clickable.onClick?.();
+        if (unref(isActive)) {
+            clickables.filter(c => unref(c.canClick)).forEach(c => c.onClick?.());
         }
     });
 }

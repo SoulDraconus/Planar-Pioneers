@@ -37,6 +37,7 @@ import {
 } from "./boardUtils";
 import { Section, createCollapsibleModifierSections, createFormulaPreview } from "./common";
 import {
+    AutomatorState,
     BoosterState,
     DowsingState,
     EmpowererState,
@@ -68,7 +69,8 @@ import {
     portalGenerator,
     quarry,
     resource,
-    upgrader
+    upgrader,
+    automator
 } from "./nodeTypes";
 import { GenericPlane, createPlane } from "./planes";
 
@@ -87,7 +89,8 @@ const types = {
     portal,
     influence,
     booster,
-    upgrader
+    upgrader,
+    automator
 };
 
 /**
@@ -113,7 +116,8 @@ export const main = createLayer("main", function (this: BaseLayer) {
         coal: board.types.empowerer.nodes.value[0],
         iron: board.types.portalGenerator.nodes.value[0],
         gold: board.types.booster.nodes.value[0],
-        platinum: board.types.upgrader.nodes.value[0]
+        platinum: board.types.upgrader.nodes.value[0],
+        berylium: board.types.automator.nodes.value[0]
     }));
 
     const influenceNodes: ComputedRef<Record<Influences, BoardNode>> = computed(() => ({
@@ -121,6 +125,13 @@ export const main = createLayer("main", function (this: BaseLayer) {
             acc[(curr.state as unknown as InfluenceState).type] = curr;
             return acc;
         }, {} as Record<Influences, BoardNode>)
+    }));
+
+    const portalNodes: ComputedRef<Record<string, BoardNode>> = computed(() => ({
+        ...board.types.portal.nodes.value.reduce((acc, curr) => {
+            acc[(curr.state as unknown as PortalState).id] = curr;
+            return acc;
+        }, {} as Record<string, BoardNode>)
     }));
 
     const resourceLevels = computed(() =>
@@ -337,10 +348,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
                     links.push({
                         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                         startNode: booster.value!,
-                        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                        endNode: (board as GenericBoard).types.portal.nodes.value.find(
-                            node => (node.state as unknown as PortalState).id === portal
-                        )!,
+                        endNode: portalNodes.value[portal],
                         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                         stroke: isPowered(booster.value!) ? "var(--accent1)" : "var(--foreground)",
                         strokeWidth: 4
@@ -353,9 +361,19 @@ export const main = createLayer("main", function (this: BaseLayer) {
                         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                         startNode: upgrader.value!,
                         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                        endNode: (board as GenericBoard).types.portal.nodes.value.find(
-                            node => (node.state as unknown as PortalState).id === portal
-                        )!,
+                        endNode: portalNodes.value[portal],
+                        stroke: "var(--foreground)",
+                        strokeWidth: 4
+                    });
+                });
+            }
+            if (automator.value != null) {
+                (automator.value.state as unknown as AutomatorState).portals.forEach(portal => {
+                    links.push({
+                        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                        startNode: automator.value!,
+                        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                        endNode: portalNodes.value[portal],
                         stroke: "var(--foreground)",
                         strokeWidth: 4
                     });
@@ -390,7 +408,8 @@ export const main = createLayer("main", function (this: BaseLayer) {
     );
     const booster: ComputedRef<BoardNode | undefined> = computed(() => toolNodes.value.gold);
     const upgrader: ComputedRef<BoardNode | undefined> = computed(() => toolNodes.value.platinum);
-    const poweredMachines = [mine, dowsing, quarry, empowerer, booster, upgrader];
+    const automator: ComputedRef<BoardNode | undefined> = computed(() => toolNodes.value.berylium);
+    const poweredMachines = [mine, dowsing, quarry, empowerer, booster, upgrader, automator];
 
     function grantResource(type: Resources, amount: DecimalSource) {
         let node = resourceNodes.value[type];
@@ -800,6 +819,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
             checkConnections(curr, empowerer, "tools");
             checkConnections(curr, booster, "portals");
             checkConnections(curr, upgrader, "portals");
+            checkConnections(curr, automator, "portals");
         }
     });
 
@@ -822,6 +842,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
         empowerer,
         booster,
         upgrader,
+        automator,
         resourceLevels,
         planarMultis,
         display: jsx(() => (
