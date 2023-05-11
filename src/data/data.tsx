@@ -62,6 +62,12 @@ export interface AutomatorState {
     powered: boolean;
 }
 
+export interface InvestmentsState {
+    portals: string[];
+    maxConnections: number;
+    powered: boolean;
+}
+
 export const mineLootTable = {
     dirt: 120,
     sand: 60,

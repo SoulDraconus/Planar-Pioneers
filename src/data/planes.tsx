@@ -5,7 +5,7 @@ import { GenericAchievement, createAchievement } from "features/achievements/ach
 import { createBar } from "features/bars/bar";
 import { BoardNode, getUniqueNodeID } from "features/boards/board";
 import { GenericClickable, createClickable, setupAutoClick } from "features/clickables/clickable";
-import { createCumulativeConversion } from "features/conversion";
+import { createCumulativeConversion, setupPassiveGeneration } from "features/conversion";
 import { CoercableComponent, findFeatures, isVisible, jsx } from "features/feature";
 import { GenericRepeatable, RepeatableType, createRepeatable } from "features/repeatable";
 import { createReset } from "features/reset";
@@ -47,6 +47,7 @@ import {
     BoosterState,
     InfluenceState,
     Influences,
+    InvestmentsState,
     PortalState,
     ResourceState,
     Resources,
@@ -536,6 +537,16 @@ export function createPlane(
                             {renderRow(clickable)}
                         </>
                     ));
+                    setupPassiveGeneration(this as GenericLayer, conversion, () =>
+                        earnedTreasures.value.length < length &&
+                        main.investments.value != null &&
+                        isPowered(main.investments.value) &&
+                        (
+                            main.investments.value.state as unknown as InvestmentsState
+                        ).portals.includes(id)
+                            ? 0.01
+                            : 0
+                    );
                     break;
                 case "xp": {
                     const xp = createResource<DecimalSource>(0);

@@ -43,6 +43,7 @@ import {
     EmpowererState,
     InfluenceState,
     Influences,
+    InvestmentsState,
     MineState,
     Passives,
     PortalGeneratorState,
@@ -57,20 +58,21 @@ import {
 } from "./data";
 import "./main.css";
 import {
+    automator,
     booster,
     brokenFactory,
     dowsing,
     empowerer,
     factory,
     influence,
+    investments,
     mine,
     passive,
     portal,
     portalGenerator,
     quarry,
     resource,
-    upgrader,
-    automator
+    upgrader
 } from "./nodeTypes";
 import { GenericPlane, createPlane } from "./planes";
 
@@ -90,7 +92,8 @@ const types = {
     influence,
     booster,
     upgrader,
-    automator
+    automator,
+    investments
 };
 
 /**
@@ -117,7 +120,8 @@ export const main = createLayer("main", function (this: BaseLayer) {
         iron: board.types.portalGenerator.nodes.value[0],
         gold: board.types.booster.nodes.value[0],
         platinum: board.types.upgrader.nodes.value[0],
-        berylium: board.types.automator.nodes.value[0]
+        berylium: board.types.automator.nodes.value[0],
+        ultimatum: board.types.investments.nodes.value[0]
     }));
 
     const influenceNodes: ComputedRef<Record<Influences, BoardNode>> = computed(() => ({
@@ -379,6 +383,18 @@ export const main = createLayer("main", function (this: BaseLayer) {
                     });
                 });
             }
+            if (investments.value != null) {
+                (investments.value.state as unknown as InvestmentsState).portals.forEach(portal => {
+                    links.push({
+                        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                        startNode: investments.value!,
+                        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                        endNode: portalNodes.value[portal],
+                        stroke: "var(--foreground)",
+                        strokeWidth: 4
+                    });
+                });
+            }
             Object.values(influenceNodes.value).forEach(node => {
                 const state = node.state as unknown as InfluenceState;
                 if (state.type === "increaseResources" || state.type === "decreaseResources") {
@@ -409,7 +425,19 @@ export const main = createLayer("main", function (this: BaseLayer) {
     const booster: ComputedRef<BoardNode | undefined> = computed(() => toolNodes.value.gold);
     const upgrader: ComputedRef<BoardNode | undefined> = computed(() => toolNodes.value.platinum);
     const automator: ComputedRef<BoardNode | undefined> = computed(() => toolNodes.value.berylium);
-    const poweredMachines = [mine, dowsing, quarry, empowerer, booster, upgrader, automator];
+    const investments: ComputedRef<BoardNode | undefined> = computed(
+        () => toolNodes.value.ultimatum
+    );
+    const poweredMachines = [
+        mine,
+        dowsing,
+        quarry,
+        empowerer,
+        booster,
+        upgrader,
+        automator,
+        investments
+    ];
 
     function grantResource(type: Resources, amount: DecimalSource) {
         let node = resourceNodes.value[type];
@@ -820,6 +848,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
             checkConnections(curr, booster, "portals");
             checkConnections(curr, upgrader, "portals");
             checkConnections(curr, automator, "portals");
+            checkConnections(curr, investments, "portals");
         }
     });
 
@@ -843,6 +872,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
         booster,
         upgrader,
         automator,
+        investments,
         resourceLevels,
         planarMultis,
         display: jsx(() => (

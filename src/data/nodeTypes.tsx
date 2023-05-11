@@ -34,6 +34,7 @@ import {
     DowsingState,
     EmpowererState,
     InfluenceState,
+    InvestmentsState,
     MineState,
     Passives,
     PortalGeneratorState,
@@ -784,6 +785,55 @@ export const automator = {
                 (node.state as unknown as AutomatorState)?.portals.length ?? 0 > 0
         },
         getIncreaseConnectionsAction(x => x.add(4).pow_base(1e6)),
+        togglePoweredAction
+    ],
+    canAccept: canAcceptPortal,
+    onDrop: onDropPortal,
+    classes: node => ({
+        running: isPowered(node)
+    }),
+    draggable: true
+} as NodeTypeOptions;
+
+export const investments = {
+    shape: Shape.Diamond,
+    size: 50,
+    title: "💱",
+    label: node => {
+        if (node === main.board.selectedNode.value) {
+            return {
+                text:
+                    (node.state as unknown as InvestmentsState).portals.length === 0
+                        ? "Investments - Drag a portal to me!"
+                        : `Investing (${
+                              (node.state as unknown as InvestmentsState).portals.length
+                          }/${Decimal.add(
+                              (node.state as unknown as InvestmentsState).maxConnections,
+                              main.computedBonusConnectionsModifier.value
+                          )})`
+            };
+        }
+        return labelForAcceptingPortal(node, portal => {
+            return `Auto-buy ${(layers[portal] as GenericPlane).name}'s repeatables and dimensions`;
+        });
+    },
+    actionDistance: Math.PI / 4,
+    actions: [
+        {
+            id: "deselect",
+            icon: "close",
+            tooltip: {
+                text: "Disconnect portals"
+            },
+            onClick(node: BoardNode) {
+                node.state = { ...(node.state as object), portals: [] };
+                main.board.selectedAction.value = null;
+                main.board.selectedNode.value = null;
+            },
+            visibility: (node: BoardNode) =>
+                (node.state as unknown as InvestmentsState)?.portals.length ?? 0 > 0
+        },
+        getIncreaseConnectionsAction(x => x.add(3).pow_base(1e8)),
         togglePoweredAction
     ],
     canAccept: canAcceptPortal,
