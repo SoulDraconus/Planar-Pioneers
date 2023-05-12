@@ -25,11 +25,18 @@ export const deselectAllAction = {
     id: "deselect",
     icon: "close",
     tooltip: (node: BoardNode) => ({
-        text: "tools" in (node.state as object) ? "Disconnect tools" : "Disconnect resources"
+        text:
+            "portals" in (node.state as object)
+                ? "Disconnect portals"
+                : "tools" in (node.state as object)
+                ? "Disconnect tools"
+                : "Disconnect resources"
     }),
     onClick(node: BoardNode) {
         if (Array.isArray((node.state as unknown as InfluenceState)?.data)) {
             node.state = { ...(node.state as object), data: [] };
+        } else if ("portals" in (node.state as object)) {
+            node.state = { ...(node.state as object), portals: [] };
         } else if ("resources" in (node.state as object)) {
             node.state = { ...(node.state as object), resources: [] };
         } else if ("tools" in (node.state as object)) {
@@ -41,6 +48,9 @@ export const deselectAllAction = {
     visibility: (node: BoardNode) => {
         if (Array.isArray((node.state as unknown as InfluenceState)?.data)) {
             return ((node.state as unknown as InfluenceState).data as string[]).length > 0;
+        }
+        if ("portals" in (node.state as object)) {
+            return (node.state as { portals: string[] }).portals.length > 0;
         }
         if ("resources" in (node.state as object)) {
             return (node.state as { resources: Resources[] }).resources.length > 0;

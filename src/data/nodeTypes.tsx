@@ -652,20 +652,7 @@ export const booster = {
     },
     actionDistance: Math.PI / 4,
     actions: [
-        {
-            id: "deselect",
-            icon: "close",
-            tooltip: {
-                text: "Disconnect portals"
-            },
-            onClick(node: BoardNode) {
-                node.state = { ...(node.state as object), portals: [] };
-                main.board.selectedAction.value = null;
-                main.board.selectedNode.value = null;
-            },
-            visibility: (node: BoardNode) =>
-                (node.state as unknown as BoosterState)?.portals.length ?? 0 > 0
-        },
+        deselectAllAction,
         getIncreaseConnectionsAction(x => x.add(6).pow_base(1000)),
         {
             id: "increaseBoost",
@@ -733,20 +720,7 @@ export const upgrader = {
     },
     actionDistance: Math.PI / 4,
     actions: [
-        {
-            id: "deselect",
-            icon: "close",
-            tooltip: {
-                text: "Disconnect portals"
-            },
-            onClick(node: BoardNode) {
-                node.state = { ...(node.state as object), portals: [] };
-                main.board.selectedAction.value = null;
-                main.board.selectedNode.value = null;
-            },
-            visibility: (node: BoardNode) =>
-                (node.state as unknown as UpgraderState)?.portals.length ?? 0 > 0
-        },
+        deselectAllAction,
         getIncreaseConnectionsAction(x => x.add(4).pow_base(1e6)),
         togglePoweredAction
     ],
@@ -782,20 +756,7 @@ export const automator = {
     },
     actionDistance: Math.PI / 4,
     actions: [
-        {
-            id: "deselect",
-            icon: "close",
-            tooltip: {
-                text: "Disconnect portals"
-            },
-            onClick(node: BoardNode) {
-                node.state = { ...(node.state as object), portals: [] };
-                main.board.selectedAction.value = null;
-                main.board.selectedNode.value = null;
-            },
-            visibility: (node: BoardNode) =>
-                (node.state as unknown as AutomatorState)?.portals.length ?? 0 > 0
-        },
+        deselectAllAction,
         getIncreaseConnectionsAction(x => x.add(4).pow_base(1e6)),
         togglePoweredAction
     ],
@@ -831,20 +792,7 @@ export const investments = {
     },
     actionDistance: Math.PI / 4,
     actions: [
-        {
-            id: "deselect",
-            icon: "close",
-            tooltip: {
-                text: "Disconnect portals"
-            },
-            onClick(node: BoardNode) {
-                node.state = { ...(node.state as object), portals: [] };
-                main.board.selectedAction.value = null;
-                main.board.selectedNode.value = null;
-            },
-            visibility: (node: BoardNode) =>
-                (node.state as unknown as InvestmentsState)?.portals.length ?? 0 > 0
-        },
+        deselectAllAction,
         getIncreaseConnectionsAction(x => x.add(3).pow_base(1e8)),
         togglePoweredAction
     ],
