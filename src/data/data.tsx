@@ -299,7 +299,7 @@ export const passives = {
     },
     goldRelic: {
         description: (empowered: boolean) =>
-            empowered ? "Each treasure quadruples XP gain" : "Each treasure doubles XP gain"
+            empowered ? "Each treasure gives +20% XP gain" : "Each treasure gives +10% XP gain"
     },
     emeraldRelic: {
         description: (empowered: boolean) =>
@@ -317,7 +317,9 @@ export const passives = {
     },
     beryliumRelic: {
         description: (empowered: boolean) =>
-            empowered ? "log(energy) boosts planar speed" : "log(energy)/10 boosts planar speed"
+            empowered
+                ? "log(energy)^0.5 boosts planar speed"
+                : "log(energy)^0.25 boosts planar speed"
     },
     unobtainiumRelic: {
         description: (empowered: boolean) =>

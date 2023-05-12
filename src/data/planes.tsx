@@ -33,7 +33,12 @@ import Formula, {
     calculateMaxAffordable,
     unrefFormulaSource
 } from "game/formulas/formulas";
-import { FormulaSource, GenericFormula, InvertibleIntegralFormula } from "game/formulas/types";
+import {
+    FormulaSource,
+    GenericFormula,
+    InvertibleFormula,
+    InvertibleIntegralFormula
+} from "game/formulas/types";
 import { BaseLayer, GenericLayer, createLayer } from "game/layers";
 import {
     Modifier,
@@ -341,7 +346,7 @@ export function createPlane(
                         let effect: ComputedRef<string>;
                         let modifier: WithRequired<Modifier, "description" | "invert">;
                         let previewModifier: WithRequired<Modifier, "invert">;
-                        let cost: GenericFormula;
+                        let cost: InvertibleFormula;
                         const costInput = Formula.variable(
                             computed(() => repeatable.amount.value)
                         ).times(2);
@@ -349,7 +354,7 @@ export function createPlane(
                             case "add": {
                                 const addend = Decimal.add(initialCost, 10).times(random() + 0.5);
                                 description = `Gain ${format(addend)} ${resource.displayName}/s`;
-                                cost = costInput.add(1).times(initialCost);
+                                cost = costInput.add(1).times(1.5).times(initialCost);
                                 costFormula = costFormula.add(
                                     computed(() =>
                                         Decimal.sub(n.value, currentN).add(1).times(5).times(addend)
@@ -369,7 +374,10 @@ export function createPlane(
                                 }));
                                 previewModifier = createAdditiveModifier(() => ({
                                     addend: () =>
-                                        Decimal.add(unref(repeatable.totalAmount), 1).times(addend)
+                                        Decimal.add(
+                                            unref(repeatable.totalAmount),
+                                            repeatable.amountToIncrease.value
+                                        ).times(addend)
                                 }));
                                 break;
                             }
@@ -378,7 +386,9 @@ export function createPlane(
                                 description = `Multiply previous ${
                                     resource.displayName
                                 } gain by x${format(multiplier)}.`;
-                                cost = costInput.pow_base(multiplier).times(initialCost);
+                                cost = costInput
+                                    .pow_base(Decimal.times(multiplier, 1.5))
+                                    .times(initialCost);
                                 costFormula = costFormula.add(
                                     computed(() =>
                                         Decimal.sub(n.value, currentN)
@@ -404,9 +414,10 @@ export function createPlane(
                                 }));
                                 previewModifier = createMultiplicativeModifier(() => ({
                                     multiplier: () =>
-                                        Decimal.add(unref(repeatable.totalAmount), 1).pow_base(
-                                            multiplier
-                                        )
+                                        Decimal.add(
+                                            unref(repeatable.totalAmount),
+                                            repeatable.amountToIncrease.value
+                                        ).pow_base(multiplier)
                                 }));
                                 break;
                             }
@@ -453,8 +464,11 @@ export function createPlane(
                             feature: repeatable,
                             canClick: () => unref(repeatable.canClick),
                             modifier,
-                            cost,
-                            previewModifier
+                            cost: computed(() =>
+                                calculateCost(cost, repeatable.amountToIncrease.value)
+                            ),
+                            previewModifier,
+                            showETA: () => !repeatable.maxed.value
                         });
                         repeatables.push(repeatable);
                     }
@@ -471,8 +485,7 @@ export function createPlane(
                         computed(() =>
                             Decimal.sub(n.value, currentN)
                                 .add(1)
-                                .pow_base(5)
-                                .pow(effectExponent)
+                                .pow10()
                                 .times(cachedGain[currentN - 1])
                         )
                     );
@@ -497,7 +510,7 @@ export function createPlane(
                         }
                     }));
                     cachedGain[n.value] = costFormula.evaluate();
-                    n.value += 2;
+                    n.value += 4;
                     const clickableVisibility = visibility;
                     const title = getPowerName(random);
                     const formula = Formula.variable(prestigeResource).pow(effectExponent).add(1);
@@ -629,14 +642,13 @@ export function createPlane(
                         computed(() =>
                             Decimal.sub(n.value, currentN)
                                 .add(1)
-                                .sqrt()
                                 .times(3)
                                 .pow(effectExponent)
                                 .times(cachedGain[currentN - 1])
                         )
                     );
                     cachedGain[n.value] = costFormula.evaluate();
-                    n.value += 2;
+                    n.value += 3;
                     const barColor = getColor([0.18, 0.2, 0.25], random);
                     const bar = createBar(() => ({
                         direction: Direction.Right,
@@ -665,10 +677,12 @@ export function createPlane(
                         ) {
                             let totalDiff = Decimal.times(computedPlanarSpeedModifier.value, diff);
                             if (main.toolNodes.value.goldRelic != null) {
-                                totalDiff = Decimal.pow(
-                                    isEmpowered("goldRelic") ? 4 : 2,
+                                totalDiff = Decimal.times(
+                                    isEmpowered("goldRelic") ? 0.2 : 0.1,
                                     earnedTreasures.value.length
-                                ).times(totalDiff);
+                                )
+                                    .add(1)
+                                    .times(totalDiff);
                             }
                             xp.value = Decimal.add(totalDiff, xp.value);
                         }
@@ -1153,6 +1167,16 @@ export function createPlane(
                     ).add(1),
                 description: () => (isEmpowered("coalRelic") ? "Empowered " : "") + relics.coal,
                 enabled: () => main.toolNodes.value.coalRelic != null
+            })),
+            createMultiplicativeModifier(() => ({
+                multiplier: () =>
+                    Decimal.add(main.energy.value, 1)
+                        .log10()
+                        .add(1)
+                        .pow(isEmpowered("beryliumRelic") ? 0.5 : 0.25),
+                description: () =>
+                    (isEmpowered("beryliumRelic") ? "Empowered " : "") + relics.berylium,
+                enabled: () => main.toolNodes.value.beryliumRelic != null
             }))
         ]);
         const computedPlanarSpeedModifier = computed(() => planarSpeedModifier.apply(1));
