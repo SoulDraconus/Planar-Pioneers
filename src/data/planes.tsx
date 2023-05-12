@@ -106,7 +106,14 @@ export function createPlane(
             difficultyRand = 1;
         }
         const difficulty = difficultyRand + tierIndex + 1;
-        const rewardsLevel = "increaseRewards" in influenceState ? difficulty + 1 : difficulty;
+        const initialBonusRewardsLevel =
+            main.toolNodes.value.sandRelic != null ? (isEmpowered("sandRelic") ? 2 : 1) : 0;
+        const bonusRewardsLevel = persistent<number>(initialBonusRewardsLevel);
+        const rewardsLevel = computed(
+            () =>
+                ("increaseRewards" in influenceState ? difficulty + 1 : difficulty) +
+                bonusRewardsLevel.value
+        );
         let length =
             "relic" in influenceState ? tierIndex + 2 : Math.ceil(random() * (tierIndex + 2));
         if ("increaseLength" in influenceState) {
@@ -903,7 +910,7 @@ export function createPlane(
                 case "cache":
                     randomResource = getRandomResource(random, influences);
                     description = `Gain ${format(
-                        Decimal.div(rewardsLevel, 12)
+                        Decimal.div(rewardsLevel.value, 12)
                     )}x your current ${randomResource}.`;
                     onComplete = () =>
                         main.grantResource(
@@ -913,27 +920,29 @@ export function createPlane(
                                     main.resourceNodes.value[randomResource]
                                         ?.state as unknown as ResourceState | null
                                 )?.amount ?? 0,
-                                Decimal.div(rewardsLevel, 12)
+                                Decimal.div(rewardsLevel.value, 12)
                             )
                         );
                     break;
                 case "generation":
                     randomResource = getRandomResource(random, influences);
-                    const gain = Decimal.div(rewardsLevel, 40).times(mineLootTable[randomResource]);
+                    const gain = Decimal.div(rewardsLevel.value, 40).times(
+                        mineLootTable[randomResource]
+                    );
                     description = `Gain ${format(gain)} ${randomResource}/s while plane is active.`;
                     update = diff => main.grantResource(randomResource, Decimal.times(diff, gain));
                     link = computed(() => main.resourceNodes.value[randomResource]);
                     break;
                 case "resourceMulti":
                     effectedResource = randomResource = getRandomResource(random, influences);
-                    resourceMulti = Decimal.div(rewardsLevel, 10).pow_base(2);
+                    resourceMulti = Decimal.div(rewardsLevel.value, 10).pow_base(2);
                     description = `Gain ${format(
                         resourceMulti
                     )}x ${randomResource} while plane is active.`;
                     break;
                 case "energyMulti":
                     effectedResource = "energy";
-                    resourceMulti = Decimal.div(rewardsLevel, 8).add(1);
+                    resourceMulti = Decimal.div(rewardsLevel.value, 8).add(1);
                     description = `Gain ${format(resourceMulti)}x energy while plane is active.`;
                     break;
                 case "influences":
@@ -1256,6 +1265,7 @@ export function createPlane(
             earnedTreasures,
             showNotif,
             timeActive,
+            bonusRewardsLevel,
             display: jsx(() => (
                 <>
                     <StickyVue class="nav-container" style="z-index: 5">

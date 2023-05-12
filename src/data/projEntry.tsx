@@ -10,7 +10,7 @@ import {
 import { jsx } from "features/feature";
 import { createResource } from "features/resources/resource";
 import { createTabFamily } from "features/tabs/tabFamily";
-import Formula, { calculateCost } from "game/formulas/formulas";
+import Formula from "game/formulas/formulas";
 import { GenericFormula } from "game/formulas/types";
 import { BaseLayer, GenericLayer, createLayer, layers } from "game/layers";
 import {
@@ -496,7 +496,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
                     computedTotalResourceLevels.value
                 ),
             description: () =>
-                `${formatSmall(computedmaterialLevelEffectModifier.value)}x per Resource Level`
+                `${formatSmall(computedmaterialLevelEffectModifier.value, 3)}x per Resource Level`
         })),
         createMultiplicativeModifier(() => ({
             multiplier: () => (isEmpowered("stone") ? 4 : 2),
