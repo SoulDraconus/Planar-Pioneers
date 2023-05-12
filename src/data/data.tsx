@@ -231,7 +231,7 @@ export const passives = {
     },
     copper: {
         description: (empowered: boolean) =>
-            empowered ? "Material level is 20% stronger" : "Material level is 10% stronger"
+            empowered ? "Material level is 40% stronger" : "Material level is 20% stronger"
     },
     silver: {
         description: (empowered: boolean) =>

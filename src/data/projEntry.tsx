@@ -556,7 +556,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
 
     const materialLevelEffectModifier = createSequentialModifier(() => [
         createAdditiveModifier(() => ({
-            addend: () => (isEmpowered("copper") ? 0.002 : 0.001),
+            addend: () => (isEmpowered("copper") ? 0.004 : 0.002),
             description: () => (isEmpowered("copper") ? "Empowered " : "") + tools.copper.name,
             enabled: () => toolNodes.value.copper != null
         }))
