@@ -313,9 +313,9 @@ export function createPlane(
                             previewModifier
                         });
                         resourceModifiers.push(
-                            modifier(() => main.toolNodes.value.dirtRelic != null)
+                            modifier(() => main.toolNodes.value.stoneRelic != null)
                         );
-                        resourceModifiers.push(modifier(() => isEmpowered("dirtRelic")));
+                        resourceModifiers.push(modifier(() => isEmpowered("stoneRelic")));
                         upgrades.push(upgrade);
                     }
                     features.push(upgrades);
@@ -434,9 +434,9 @@ export function createPlane(
                                 visibility: repeatableVisibility,
                                 bonusAmount: () =>
                                     Decimal.gt(repeatable.amount.value, 0)
-                                        ? isEmpowered("stoneRelic")
+                                        ? isEmpowered("dirtRelic")
                                             ? 2
-                                            : main.toolNodes.value.stoneRelic != null
+                                            : main.toolNodes.value.dirtRelic != null
                                             ? 1
                                             : 0
                                         : 0

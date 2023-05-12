@@ -198,11 +198,11 @@ export const tools = {
 >;
 
 export const relics = {
-    dirt: "Replicator",
+    dirt: "BOGO Coupon",
     sand: "Metal Detector",
     gravel: "Neural Networks",
     wood: "Mining Laser",
-    stone: "BOGO Coupon",
+    stone: "Replicator",
     coal: "Planar Intelligence",
     copper: "Efficient Code",
     iron: "Trade Agreements",
@@ -257,7 +257,7 @@ export const passives = {
     },
     dirtRelic: {
         description: (empowered: boolean) =>
-            empowered ? "Upgrades apply thrice" : "Upgrades apply twice"
+            empowered ? "2 free levels for repeatables" : "1 free level for repeatables"
     },
     sandRelic: {
         description: (empowered: boolean) =>
@@ -275,7 +275,7 @@ export const passives = {
     },
     stoneRelic: {
         description: (empowered: boolean) =>
-            empowered ? "2 free levels for repeatables" : "1 free level for repeatables"
+            empowered ? "Upgrades apply thrice" : "Upgrades apply twice"
     },
     coalRelic: {
         description: (empowered: boolean) =>
