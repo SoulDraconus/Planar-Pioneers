@@ -634,18 +634,25 @@ export const main = createLayer("main", function (this: BaseLayer) {
         );
         return Decimal.add(n, 1).times(n).div(2).add(9).pow10();
     });
-    const portalCostModifier = createSequentialModifier(() =>
-        (Object.keys(influences) as Influences[]).map(influence =>
+    const portalCostModifier = createSequentialModifier(() => [
+        ...(Object.keys(influences) as Influences[]).map(influence =>
             createMultiplicativeModifier(() => ({
                 multiplier: influences[influence].cost,
                 description: influences[influence].display,
                 enabled: () =>
                     (
                         portalGenerator.value?.state as unknown as PortalGeneratorState | undefined
-                    )?.influences.includes(influence) ?? false
+                    )?.influences.includes(influence) ?? false,
+                smallerIsBetter: true
             }))
-        )
-    );
+        ),
+        createMultiplicativeModifier(() => ({
+            multiplier: () => (isEmpowered("emeraldRelic") ? 0.05 : 0.1),
+            description: () => (isEmpowered("emeraldRelic") ? "Empowered " : "") + relics.emerald,
+            enabled: () => toolNodes.value.emeraldRelic != null,
+            smallerIsBetter: true
+        }))
+    ]);
     const computedPortalCost = computed(() => portalCostModifier.apply(basePortalCost.value));
 
     const [energyTab, energyTabCollapsed] = createCollapsibleModifierSections(() => [
@@ -670,7 +677,8 @@ export const main = createLayer("main", function (this: BaseLayer) {
                     (portalGenerator.value?.state as unknown as PortalGeneratorState | undefined)
                         ?.tier ?? "dirt"
                 )}-tier Base Cost`,
-            visible: () => portalGenerator.value != null
+            visible: () => portalGenerator.value != null,
+            smallerIsBetter: true
         },
         {
             title: "Bonus Connections",

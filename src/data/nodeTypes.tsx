@@ -399,7 +399,7 @@ export const empowerer = {
     actionDistance: Math.PI / 4,
     actions: [
         deselectAllAction,
-        getIncreaseConnectionsAction(x => x.add(3).pow_base(1000), 16),
+        getIncreaseConnectionsAction(x => x.add(3).pow_base(1000), 24),
         togglePoweredAction
     ],
     canAccept: canAcceptTool,

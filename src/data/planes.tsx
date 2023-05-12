@@ -1078,9 +1078,12 @@ export function createPlane(
             })),
             createMultiplicativeModifier(() => ({
                 multiplier: () =>
-                    ((isEmpowered("diamond") ? 2 : 1) *
-                        upgrades.filter(u => u.bought.value).length) /
-                    10,
+                    Decimal.add(
+                        1,
+                        ((isEmpowered("diamond") ? 2 : 1) *
+                            upgrades.filter(u => u.bought.value).length) /
+                            10
+                    ),
                 description: () =>
                     (isEmpowered("diamond") ? "Empowered " : "") + tools.diamond.name,
                 enabled: () => main.toolNodes.value.diamond != null
@@ -1104,7 +1107,8 @@ export function createPlane(
                         100
                     )
                         .times(isEmpowered("gravelRelic") ? 2 : 1)
-                        .add(1),
+                        .add(1)
+                        .pow(0.75),
                 description: () => (isEmpowered("gravelRelic") ? "Empowered " : "") + relics.gravel,
                 enabled: () => main.toolNodes.value.gravelRelic != null
             }))

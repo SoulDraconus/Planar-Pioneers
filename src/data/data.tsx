@@ -266,8 +266,8 @@ export const passives = {
     gravelRelic: {
         description: (empowered: boolean) =>
             empowered
-                ? "+2% plane's resource gain per repeatable purchase"
-                : "+1% plane's resource gain per repeatable purchase"
+                ? "+2% plane's resource gain per repeatable purchase (diminishing)"
+                : "+1% plane's resource gain per repeatable purchase (diminishing)"
     },
     woodRelic: {
         description: (empowered: boolean) =>
@@ -304,8 +304,8 @@ export const passives = {
     emeraldRelic: {
         description: (empowered: boolean) =>
             empowered
-                ? "Creating portals costs a third the energy"
-                : "Creating portals costs half the energy"
+                ? "Creating portals costs 20x less energy"
+                : "Creating portals costs 10x less energy"
     },
     platinumRelic: {
         description: (empowered: boolean) =>
