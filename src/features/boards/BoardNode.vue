@@ -163,7 +163,7 @@ const _props = defineProps<{
     };
     hasDragged?: boolean;
     receivingNode?: boolean;
-    selectedNode: BoardNode | null;
+    isSelected: boolean;
     selectedAction: GenericBoardNodeAction | null;
 }>();
 const props = toRefs(_props);
@@ -173,7 +173,6 @@ const emit = defineEmits<{
     (e: "clickAction", actionId: string): void;
 }>();
 
-const isSelected = computed(() => unref(props.selectedNode) === unref(props.node));
 const isDraggable = computed(() =>
     getNodeProperty(props.nodeType.value.draggable, unref(props.node))
 );
@@ -215,7 +214,7 @@ const title = computed(() => getNodeProperty(props.nodeType.value.title, unref(p
 const subtitle = computed(() => getNodeProperty(props.nodeType.value.subtitle, unref(props.node)));
 const label = computed(
     () =>
-        (isSelected.value
+        (props.isSelected.value
             ? unref(props.selectedAction) &&
               // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
               getNodeProperty(unref(props.selectedAction)!.tooltip, unref(props.node))
