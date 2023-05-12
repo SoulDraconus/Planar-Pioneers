@@ -157,8 +157,9 @@ export const main = createLayer("main", function (this: BaseLayer) {
             watch(
                 () => resourceLevels.value[resource],
                 (level, prevLevel) => {
+                    const diff = Decimal.sub(level, prevLevel);
                     if (
-                        Decimal.gt(level, prevLevel) &&
+                        Decimal.gt(diff, 0) &&
                         settings.active === player.id &&
                         Decimal.lte(level, 100)
                     ) {
@@ -172,6 +173,9 @@ export const main = createLayer("main", function (this: BaseLayer) {
                                           )}`}
                                     !
                                 </h3>
+                                {Decimal.gt(diff, 1) ? (
+                                    <div>Gained {formatWhole(diff)} levels</div>
+                                ) : null}
                             </div>
                         );
                     }
