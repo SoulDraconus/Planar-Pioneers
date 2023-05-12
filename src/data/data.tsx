@@ -275,7 +275,7 @@ export const passives = {
     },
     stoneRelic: {
         description: (empowered: boolean) =>
-            empowered ? "Upgrades apply thrice" : "Upgrades apply twice"
+            empowered ? "All upgrades apply twice" : "Non-multiplicative upgrades apply twice"
     },
     coalRelic: {
         description: (empowered: boolean) =>

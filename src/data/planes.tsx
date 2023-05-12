@@ -313,9 +313,12 @@ export function createPlane(
                             previewModifier
                         });
                         resourceModifiers.push(
-                            modifier(() => main.toolNodes.value.stoneRelic != null)
+                            modifier(() =>
+                                upgradeType === "add"
+                                    ? main.toolNodes.value.stoneRelic != null
+                                    : isEmpowered("stoneRelic")
+                            )
                         );
-                        resourceModifiers.push(modifier(() => isEmpowered("stoneRelic")));
                         upgrades.push(upgrade);
                     }
                     features.push(upgrades);
