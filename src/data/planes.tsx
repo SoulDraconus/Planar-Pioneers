@@ -1113,6 +1113,17 @@ export function createPlane(
                             | BoosterState
                             | undefined
                     )?.portals.includes(id) ?? false
+            })),
+            createMultiplicativeModifier(() => ({
+                multiplier: () =>
+                    Decimal.add(
+                        1,
+                        isEmpowered("coalRelic")
+                            ? Decimal.pow(earnedTreasures.value.length, 2)
+                            : earnedTreasures.value.length
+                    ),
+                description: () => (isEmpowered("coalRelic") ? "Empowered " : "") + relics.coal,
+                enabled: () => main.toolNodes.value.coalRelic != null
             }))
         ]);
         const computedPlanarSpeedModifier = computed(() => planarSpeedModifier.apply(1));
