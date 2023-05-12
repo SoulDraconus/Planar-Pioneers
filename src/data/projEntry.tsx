@@ -845,6 +845,12 @@ export const main = createLayer("main", function (this: BaseLayer) {
         if (Decimal.lt(energy.value, 0)) {
             // Uh oh, time to de-power machines!
             energy.value = 0;
+            poweredMachines.forEach(machine => {
+                (machine.value?.state as { powered: boolean }).powered = false;
+            });
+            Object.values(portalNodes.value).forEach(portal => {
+                (portal.state as { powered: boolean }).powered = false;
+            });
             mine.value.state = { ...(mine.value.state as object), powered: false };
             toast.warning(
                 <div>
