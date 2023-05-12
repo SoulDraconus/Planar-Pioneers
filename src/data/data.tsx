@@ -293,7 +293,9 @@ export const passives = {
     },
     silverRelic: {
         description: (empowered: boolean) =>
-            empowered ? "(Power machines)^2 boost ore dropped" : "Power machines boost ore dropped"
+            empowered
+                ? "(Powered machines)^2 boost quarry speed"
+                : "Powered machines boost quarry speed"
     },
     goldRelic: {
         description: (empowered: boolean) =>
@@ -307,7 +309,7 @@ export const passives = {
     },
     platinumRelic: {
         description: (empowered: boolean) =>
-            empowered ? "Triple dimensions' tick rate" : "Double dimensions' tick rate"
+            empowered ? "Quadruple dimensions' tick rate" : "Double dimensions' tick rate"
     },
     diamondRelic: {
         description: (empowered: boolean) =>

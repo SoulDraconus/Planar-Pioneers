@@ -47,6 +47,7 @@ import {
     influences,
     passives,
     relics,
+    resourceNames,
     tools
 } from "./data";
 import { GenericPlane, createPlane } from "./planes";
@@ -213,10 +214,32 @@ export const factory = {
     draggable: true
 } as NodeTypeOptions;
 
+const romanNumerals = [
+    "I",
+    "II",
+    "III",
+    "IV",
+    "V",
+    "VI",
+    "VII",
+    "VIII",
+    "IX",
+    "X",
+    "XI",
+    "XII",
+    "XIII",
+    "XIV",
+    "XV",
+    "XVI"
+];
 export const resource = {
     shape: Shape.Circle,
     size: 50,
-    title: node => camelToTitle((node.state as unknown as ResourceState).type),
+    title: node =>
+        camelToTitle((node.state as unknown as ResourceState).type) +
+        " (" +
+        romanNumerals[resourceNames.indexOf((node.state as unknown as ResourceState).type)] +
+        ")",
     subtitle: node => formatWhole((node.state as unknown as ResourceState).amount),
     progress: node => getResourceLevelProgress((node.state as unknown as ResourceState).type),
     // Make clicking resources a no-op so they can't be selected

@@ -222,10 +222,17 @@ export const main = createLayer("main", function (this: BaseLayer) {
             return 0;
         }
         const resources = (quarry.value.state as unknown as QuarryState).resources;
-        return resources.reduce(
+        let progress = resources.reduce(
             (acc, curr) => Decimal.div(100, dropRates[curr].computedModifier.value).add(acc),
             Decimal.dZero
         );
+        if (toolNodes.value.silverRelic != null) {
+            progress = Decimal.div(progress, Decimal.add(numPoweredMachines.value, 1));
+            if (isEmpowered("silverRelic")) {
+                progress = Decimal.div(progress, Decimal.add(numPoweredMachines.value, 1));
+            }
+        }
+        return progress;
     });
 
     const board = createBoard(board => ({
