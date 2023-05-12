@@ -813,10 +813,13 @@ export function createPlane(
                             ) &&
                             isVisible(repeatableVisibility)
                         ) {
-                            const totalDiff = Decimal.times(
-                                computedPlanarSpeedModifier.value,
-                                diff
-                            );
+                            let totalDiff = Decimal.times(computedPlanarSpeedModifier.value, diff);
+                            if (main.toolNodes.value.platinumRelic != null) {
+                                totalDiff = Decimal.times(
+                                    isEmpowered("platinumRelic") ? 4 : 2,
+                                    totalDiff
+                                );
+                            }
                             const gain = clickables[0].effect.evaluate();
                             energy.value = Decimal.times(gain, totalDiff).add(energy.value);
                             for (let i = 1; i < 4; i++) {
