@@ -54,6 +54,7 @@ import {
     UpgraderState,
     influences,
     mineLootTable,
+    relics,
     resourceNames,
     tools
 } from "./data";
@@ -124,6 +125,10 @@ export const main = createLayer("main", function (this: BaseLayer) {
         berylium: board.types.automator.nodes.value[0],
         ultimatum: board.types.investments.nodes.value[0]
     }));
+    const numRelicsOwned = computed(
+        () =>
+            Object.keys(relics).filter(key => (`${key}Relic` as Passives) in toolNodes.value).length
+    );
 
     const influenceNodes: ComputedRef<Record<Influences, BoardNode>> = computed(() => ({
         ...board.types.influence.nodes.value.reduce((acc, curr) => {
@@ -531,6 +536,11 @@ export const main = createLayer("main", function (this: BaseLayer) {
             multiplier: () => (isEmpowered("dirt") ? 4 : 2),
             description: () => (isEmpowered("dirt") ? "Empowered " : "") + tools.dirt.name,
             enabled: () => toolNodes.value.dirt != null
+        })),
+        createMultiplicativeModifier(() => ({
+            multiplier: () => Decimal.pow(numRelicsOwned.value, isEmpowered("woodRelic") ? 2 : 1),
+            description: () => (isEmpowered("woodRelic") ? "Empowered " : "") + relics.wood,
+            enabled: () => toolNodes.value.woodRelic != null
         }))
     ]);
     const computedMiningSpeedModifier = computed(() => miningSpeedModifier.apply(1));
