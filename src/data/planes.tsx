@@ -6,8 +6,18 @@ import { createBar } from "features/bars/bar";
 import { BoardNode, getUniqueNodeID } from "features/boards/board";
 import { GenericClickable, createClickable, setupAutoClick } from "features/clickables/clickable";
 import { createCumulativeConversion, setupPassiveGeneration } from "features/conversion";
+import {
+    BonusAmountFeatureOptions,
+    GenericBonusAmountFeature,
+    bonusAmountDecorator
+} from "features/decorators/bonusDecorator";
 import { CoercableComponent, findFeatures, isVisible, jsx } from "features/feature";
-import { GenericRepeatable, RepeatableType, createRepeatable } from "features/repeatable";
+import {
+    GenericRepeatable,
+    RepeatableOptions,
+    RepeatableType,
+    createRepeatable
+} from "features/repeatable";
 import { createReset } from "features/reset";
 import { Resource, createResource, displayResource } from "features/resources/resource";
 import TooltipVue from "features/tooltips/Tooltip.vue";
@@ -34,7 +44,7 @@ import {
 } from "game/modifiers";
 import { State, noPersist, persistent } from "game/persistence";
 import { createCostRequirement } from "game/requirements";
-import Decimal, { format, formatWhole, DecimalSource } from "util/bignum";
+import Decimal, { DecimalSource, format, formatWhole } from "util/bignum";
 import { Direction, WithRequired, camelToTitle } from "util/common";
 import { Computable, ProcessedComputable, convertComputable } from "util/computed";
 import { VueFeature, render, renderCol, renderRow, trackHover } from "util/vue";
@@ -344,17 +354,19 @@ export function createPlane(
                                 );
                                 effect = computed(
                                     () =>
-                                        format(Decimal.times(addend, repeatable.amount.value)) +
-                                        "/s"
+                                        format(
+                                            Decimal.times(addend, unref(repeatable.totalAmount))
+                                        ) + "/s"
                                 );
                                 modifier = createAdditiveModifier(() => ({
-                                    addend: () => Decimal.times(addend, repeatable.amount.value),
+                                    addend: () =>
+                                        Decimal.times(addend, unref(repeatable.totalAmount)),
                                     description: title,
-                                    enabled: () => Decimal.gt(repeatable.amount.value, 0)
+                                    enabled: () => Decimal.gt(unref(repeatable.totalAmount), 0)
                                 }));
                                 previewModifier = createAdditiveModifier(() => ({
                                     addend: () =>
-                                        Decimal.add(repeatable.amount.value, 1).times(addend)
+                                        Decimal.add(unref(repeatable.totalAmount), 1).times(addend)
                                 }));
                                 break;
                             }
@@ -377,17 +389,21 @@ export function createPlane(
                                 effect = computed(
                                     () =>
                                         "x" +
-                                        format(Decimal.pow(multiplier, repeatable.amount.value))
+                                        format(
+                                            Decimal.pow(multiplier, unref(repeatable.totalAmount))
+                                        )
                                 );
                                 modifier = createMultiplicativeModifier(() => ({
                                     multiplier: () =>
-                                        Decimal.pow(multiplier, repeatable.amount.value),
+                                        Decimal.pow(multiplier, unref(repeatable.totalAmount)),
                                     description: title,
-                                    enabled: () => Decimal.gt(repeatable.amount.value, 0)
+                                    enabled: () => Decimal.gt(unref(repeatable.totalAmount), 0)
                                 }));
                                 previewModifier = createMultiplicativeModifier(() => ({
                                     multiplier: () =>
-                                        Decimal.add(repeatable.amount.value, 1).pow_base(multiplier)
+                                        Decimal.add(unref(repeatable.totalAmount), 1).pow_base(
+                                            multiplier
+                                        )
                                 }));
                                 break;
                             }
@@ -395,18 +411,38 @@ export function createPlane(
                         cachedGain[n.value] = costFormula.evaluate();
                         n.value++;
                         const repeatableVisibility = visibility;
-                        const repeatable = createRepeatable(() => ({
-                            requirements: createCostRequirement(() => ({
-                                resource: noPersist(resource),
-                                cost
-                            })),
-                            display: () => ({
-                                title,
-                                description,
-                                effectDisplay: unref(effect)
+                        const repeatable = createRepeatable<
+                            RepeatableOptions & BonusAmountFeatureOptions
+                        >(
+                            () => ({
+                                requirements: createCostRequirement(() => ({
+                                    resource: noPersist(resource),
+                                    cost
+                                })),
+                                display: () => ({
+                                    title,
+                                    description: `${description}<br/><br/>Amount: ${formatWhole(
+                                        repeatable.amount.value
+                                    )}${
+                                        Decimal.gt(unref(repeatable.bonusAmount), 0)
+                                            ? ` [+${formatWhole(unref(repeatable.bonusAmount))}]`
+                                            : ""
+                                    }`,
+                                    effectDisplay: unref(effect),
+                                    showAmount: false
+                                }),
+                                visibility: repeatableVisibility,
+                                bonusAmount: () =>
+                                    Decimal.gt(repeatable.amount.value, 0)
+                                        ? isEmpowered("stoneRelic")
+                                            ? 2
+                                            : main.toolNodes.value.stoneRelic != null
+                                            ? 1
+                                            : 0
+                                        : 0
                             }),
-                            visibility: repeatableVisibility
-                        }));
+                            bonusAmountDecorator
+                        ) as GenericRepeatable & GenericBonusAmountFeature;
                         prepareFeature({
                             feature: repeatable,
                             canClick: () => unref(repeatable.canClick),
@@ -1017,7 +1053,7 @@ export function createPlane(
         const repeatables = findFeatures(
             features as unknown as Record<string, unknown>,
             RepeatableType
-        ) as GenericRepeatable[];
+        ) as (GenericRepeatable & GenericBonusAmountFeature)[];
 
         resourceModifiers.push(
             createMultiplicativeModifier(() => ({
@@ -1047,7 +1083,7 @@ export function createPlane(
                 multiplier: () =>
                     Decimal.div(
                         repeatables.reduce(
-                            (acc, curr) => acc.add(curr.amount.value),
+                            (acc, curr) => acc.add(unref(curr.totalAmount)),
                             Decimal.dZero
                         ),
                         100
