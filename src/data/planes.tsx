@@ -40,7 +40,7 @@ import { Computable, ProcessedComputable, convertComputable } from "util/compute
 import { VueFeature, render, renderCol, renderRow, trackHover } from "util/vue";
 import { ComputedRef, Ref, computed, ref, unref } from "vue";
 import { useToast } from "vue-toastification";
-import { isPowered } from "./boardUtils";
+import { isEmpowered, isPowered } from "./boardUtils";
 import { createCollapsibleModifierSections, createFormulaPreview, estimateTime } from "./common";
 import {
     AutomatorState,
@@ -235,7 +235,9 @@ export function createPlane(
                         const cost = nextCost.value;
                         const title = getPowerName(random);
                         let description = "";
-                        let modifier: WithRequired<Modifier, "description" | "invert">;
+                        let modifier: (
+                            condition?: () => boolean
+                        ) => WithRequired<Modifier, "description" | "invert">;
                         let previewModifier: WithRequired<Modifier, "invert">;
                         const currentN = n.value;
                         switch (upgradeType) {
@@ -243,11 +245,15 @@ export function createPlane(
                                 const addend = Decimal.add(cost, 10).pow(random() / 4 + 0.875);
                                 description = `Gain ${format(addend)} ${resource.displayName}/s`;
                                 costFormula = costFormula.add(addend);
-                                modifier = createAdditiveModifier(() => ({
-                                    addend,
-                                    description: title,
-                                    enabled: upgrade.bought
-                                }));
+                                modifier = condition =>
+                                    createAdditiveModifier(() => ({
+                                        addend,
+                                        description: title,
+                                        enabled:
+                                            condition == null
+                                                ? upgrade.bought
+                                                : () => condition() && upgrade.bought.value
+                                    }));
                                 previewModifier = createAdditiveModifier(() => ({ addend }));
                                 break;
                             }
@@ -259,11 +265,15 @@ export function createPlane(
                                 costFormula = costFormula.add(
                                     Decimal.sub(multiplier, 1).times(cachedGain[currentN - 1])
                                 );
-                                modifier = createMultiplicativeModifier(() => ({
-                                    multiplier,
-                                    description: title,
-                                    enabled: upgrade.bought
-                                }));
+                                modifier = condition =>
+                                    createMultiplicativeModifier(() => ({
+                                        multiplier,
+                                        description: title,
+                                        enabled:
+                                            condition == null
+                                                ? upgrade.bought
+                                                : () => condition() && upgrade.bought.value
+                                    }));
                                 previewModifier = createMultiplicativeModifier(() => ({
                                     multiplier
                                 }));
@@ -277,11 +287,15 @@ export function createPlane(
                                 costFormula = costFormula
                                     .add(Decimal.pow(cachedGain[currentN - 1], exponent))
                                     .sub(cachedGain[currentN - 1]);
-                                modifier = createExponentialModifier(() => ({
-                                    exponent,
-                                    description: title,
-                                    enabled: upgrade.bought
-                                }));
+                                modifier = condition =>
+                                    createExponentialModifier(() => ({
+                                        exponent,
+                                        description: title,
+                                        enabled:
+                                            condition == null
+                                                ? upgrade.bought
+                                                : () => condition() && upgrade.bought.value
+                                    }));
                                 previewModifier = createExponentialModifier(() => ({ exponent }));
                             }
                         }
@@ -302,11 +316,15 @@ export function createPlane(
                         prepareFeature({
                             feature: upgrade,
                             canClick: () => upgrade.canPurchase.value,
-                            modifier,
+                            modifier: modifier(),
                             cost,
                             showETA: () => !upgrade.bought.value,
                             previewModifier
                         });
+                        resourceModifiers.push(
+                            modifier(() => main.toolNodes.value.dirtRelic != null)
+                        );
+                        resourceModifiers.push(modifier(() => isEmpowered("dirtRelic")));
                         upgrades.push(upgrade);
                     }
                     features.push(upgrades);
