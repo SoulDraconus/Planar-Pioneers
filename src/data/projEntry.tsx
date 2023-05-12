@@ -23,7 +23,7 @@ import { State } from "game/persistence";
 import type { LayerData, Player } from "game/player";
 import player from "game/player";
 import settings from "game/settings";
-import Decimal, { DecimalSource, format, formatWhole } from "util/bignum";
+import Decimal, { DecimalSource, format, formatSmall, formatWhole } from "util/bignum";
 import { WithRequired, camelToTitle } from "util/common";
 import { render } from "util/vue";
 import { ComputedRef, computed, nextTick, reactive, ref, watch } from "vue";
@@ -52,6 +52,7 @@ import {
     ResourceState,
     Resources,
     UpgraderState,
+    influences,
     mineLootTable,
     resourceNames,
     tools
@@ -143,21 +144,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
             const amount =
                 (resourceNodes.value[curr]?.state as unknown as ResourceState | undefined)
                     ?.amount ?? 0;
-            // Sub 10 and then manually sum until we go over amount
-            let currentLevel = Decimal.floor(resourceLevelFormula.invertIntegral(amount))
-                .sub(10)
-                .clampMin(0);
-            let summedCost = calculateCost(resourceLevelFormula, currentLevel, true, 0);
-            while (true) {
-                const nextCost = resourceLevelFormula.evaluate(currentLevel);
-                if (Decimal.add(summedCost, nextCost).lte(amount)) {
-                    currentLevel = currentLevel.add(1);
-                    summedCost = Decimal.add(summedCost, nextCost);
-                } else {
-                    break;
-                }
-            }
-            acc[curr] = currentLevel;
+            acc[curr] = Decimal.floor(resourceLevelFormula.invert(amount));
             return acc;
         }, {} as Record<Resources, DecimalSource>)
     );
@@ -185,7 +172,6 @@ export const main = createLayer("main", function (this: BaseLayer) {
                                           )}`}
                                     !
                                 </h3>
-                                <div>Energy gain is now 1.01x higher.</div>
                             </div>
                         );
                     }
@@ -488,27 +474,30 @@ export const main = createLayer("main", function (this: BaseLayer) {
         return multis;
     });
 
-    const energyModifier = createSequentialModifier(() => [
-        ...resourceNames.map(resource =>
-            createMultiplicativeModifier(() => ({
-                description: () =>
-                    `${camelToTitle(resource)} (Lv. ${formatWhole(
-                        resourceLevels.value[resource]
-                    )}) (${format(computedmaterialLevelEffectModifier.value)}x per level)`,
-                multiplier: () =>
-                    Decimal.pow(
-                        computedmaterialLevelEffectModifier.value,
-                        resourceLevels.value[resource]
-                    ),
-                enabled: () =>
-                    resource in resourceNodes.value &&
-                    Decimal.gt(
-                        (resourceNodes.value[resource].state as ResourceState | undefined)
-                            ?.amount ?? 0,
-                        0
-                    )
+    const totalResourceLevels = createSequentialModifier(() =>
+        resourceNames.map(resource =>
+            createAdditiveModifier(() => ({
+                description: () => camelToTitle(resource),
+                addend: () => resourceLevels.value[resource],
+                enabled: () => Decimal.gt(resourceLevels.value[resource], 0)
             }))
-        ),
+        )
+    );
+    const computedTotalResourceLevels = computed(() => totalResourceLevels.apply(0));
+    const energyModifier = createSequentialModifier(() => [
+        createAdditiveModifier(() => ({
+            addend: computedTotalResourceLevels,
+            description: "Resource Levels"
+        })),
+        createMultiplicativeModifier(() => ({
+            multiplier: () =>
+                Decimal.pow(
+                    computedmaterialLevelEffectModifier.value,
+                    computedTotalResourceLevels.value
+                ),
+            description: () =>
+                `${formatSmall(computedmaterialLevelEffectModifier.value)}x per Resource Level`
+        })),
         createMultiplicativeModifier(() => ({
             multiplier: () => (isEmpowered("stone") ? 4 : 2),
             description: () => (isEmpowered("stone") ? "Empowered " : "") + tools.stone.name,
@@ -525,7 +514,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
             enabled: () => Decimal.gt(numPoweredMachines.value, 0)
         }))
     ]);
-    const computedEnergyModifier = computed(() => energyModifier.apply(1));
+    const computedEnergyModifier = computed(() => energyModifier.apply(0));
 
     const bonusConnectionsModifier = createSequentialModifier(() => [
         createAdditiveModifier(() => ({
@@ -604,17 +593,56 @@ export const main = createLayer("main", function (this: BaseLayer) {
         return acc;
     }, {} as Record<Resources, { modifier: WithRequired<Modifier, "invert" | "description">; computedModifier: ComputedRef<DecimalSource>; section: Section }>);
 
+    const basePortalCost = computed(() => {
+        const n = resourceNames.indexOf(
+            (portalGenerator.value?.state as unknown as PortalGeneratorState | undefined)?.tier ??
+                "dirt"
+        );
+        return Decimal.add(n, 1).times(n).div(2).add(9).pow10();
+    });
+    const portalCostModifier = createSequentialModifier(() =>
+        (Object.keys(influences) as Influences[]).map(influence =>
+            createMultiplicativeModifier(() => ({
+                multiplier: influences[influence].cost,
+                description: influences[influence].display,
+                enabled: () =>
+                    (
+                        portalGenerator.value?.state as unknown as PortalGeneratorState | undefined
+                    )?.influences.includes(influence) ?? false
+            }))
+        )
+    );
+    const computedPortalCost = computed(() => portalCostModifier.apply(basePortalCost.value));
+
     const [energyTab, energyTabCollapsed] = createCollapsibleModifierSections(() => [
+        {
+            title: "Resource Levels",
+            modifier: totalResourceLevels,
+            base: 0
+        },
         {
             title: "Energy Gain",
             modifier: energyModifier,
-            base: 1,
+            base: 0,
             unit: "/s"
+        },
+        {
+            title: "Portal Cost",
+            modifier: portalCostModifier,
+            base: basePortalCost,
+            unit: " energy",
+            baseText: () =>
+                `${camelToTitle(
+                    (portalGenerator.value?.state as unknown as PortalGeneratorState | undefined)
+                        ?.tier ?? "dirt"
+                )}-tier Base Cost`,
+            visible: () => portalGenerator.value != null
         },
         {
             title: "Bonus Connections",
             modifier: bonusConnectionsModifier,
-            base: 0
+            base: 0,
+            visible: () => Decimal.gt(computedBonusConnectionsModifier.value, 0)
         }
     ]);
     const [miningTab, miningTabCollapsed] = createCollapsibleModifierSections(() => [
@@ -875,6 +903,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
         investments,
         resourceLevels,
         planarMultis,
+        computedPortalCost,
         display: jsx(() => (
             <>
                 <StickyVue class="nav-container">

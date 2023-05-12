@@ -1,5 +1,5 @@
 import { BoardNode, GenericBoard, GenericBoardNodeAction, NodeLabel } from "features/boards/board";
-import Formula, { calculateCost } from "game/formulas/formulas";
+import Formula from "game/formulas/formulas";
 import { GenericFormula, InvertibleIntegralFormula } from "game/formulas/types";
 import Decimal, { formatWhole } from "util/bignum";
 import {
@@ -16,7 +16,11 @@ import { main } from "./projEntry";
 import { DecimalSource } from "lib/break_eternity";
 import { ComputedRef } from "vue";
 
-export const resourceLevelFormula = Formula.variable(0).add(1);
+export const resourceLevelFormula = Formula.variable(0)
+    .step(100, x => x.pow(1.5))
+    .step(Decimal.pow(900, 1.5).add(100), x => x.pow(1.5))
+    .pow(1.5);
+console.log(resourceLevelFormula);
 
 export const deselectAllAction = {
     id: "deselect",
@@ -324,12 +328,8 @@ export function getResourceLevelProgress(resource: Resources): number {
         (main.resourceNodes.value[resource]?.state as unknown as ResourceState | undefined)
             ?.amount ?? 0;
     const currentLevel = main.resourceLevels.value[resource];
-    const requiredForCurrentLevel = calculateCost(resourceLevelFormula, currentLevel, true);
-    const requiredForNextLevel = calculateCost(
-        resourceLevelFormula,
-        Decimal.add(currentLevel, 1),
-        true
-    );
+    const requiredForCurrentLevel = resourceLevelFormula.evaluate(currentLevel);
+    const requiredForNextLevel = resourceLevelFormula.evaluate(Decimal.add(currentLevel, 1));
     return Decimal.sub(amount, requiredForCurrentLevel)
         .max(0)
         .div(Decimal.sub(requiredForNextLevel, requiredForCurrentLevel))

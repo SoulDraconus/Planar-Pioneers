@@ -119,9 +119,7 @@ export const factory = {
             ).type;
             const text = node.state === resource ? "Disconnect" : tools[resource].name;
             const color =
-                node.state === resource ||
-                (Decimal.gte(main.energy.value, tools[resource].cost) &&
-                    main.toolNodes.value[resource] == null)
+                node.state === resource || main.toolNodes.value[resource] == null
                     ? "var(--accent2)"
                     : "var(--danger)";
             return {
@@ -189,7 +187,10 @@ export const factory = {
     progress: node =>
         node.state == null || main.toolNodes.value[node.state as Resources] != null
             ? 0
-            : Decimal.div(main.energy.value, tools[node.state as Resources].cost)
+            : Decimal.div(
+                  Decimal.sqrt(main.energy.value),
+                  Decimal.sqrt(tools[node.state as Resources].cost)
+              )
                   .clampMax(1)
                   .toNumber(),
     progressDisplay: ProgressDisplay.Fill,
@@ -449,13 +450,24 @@ export const portalGenerator = {
             id: "makePortal",
             icon: "done",
             tooltip: node => ({
-                text: `Spawn ${(node.state as unknown as PortalGeneratorState).tier}-tier portal`
+                text: `Spawn ${
+                    (node.state as unknown as PortalGeneratorState).tier
+                }-tier portal - ${formatWhole(main.computedPortalCost.value)} energy`
             }),
+            fillColor: () =>
+                Decimal.gte(main.energy.value, main.computedPortalCost.value)
+                    ? "var(--accent2)"
+                    : "var(--danger)",
+            confirmationLabel: () =>
+                Decimal.gte(main.energy.value, main.computedPortalCost.value)
+                    ? { text: "Tap again to confirm" }
+                    : { text: "Cannot afford", color: "var(--danger)" },
             onClick(node) {
                 let id = 0;
                 while (`portal-${id}` in layers) {
                     id++;
                 }
+                main.energy.value = Decimal.sub(main.energy.value, main.computedPortalCost.value);
                 const { tier, influences } = node.state as unknown as PortalGeneratorState;
                 addLayer(
                     createPlane(
