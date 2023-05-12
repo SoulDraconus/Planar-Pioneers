@@ -921,7 +921,7 @@ export function createPlane(
                     randomResource = getRandomResource(random, influences);
                     description = `Gain ${format(
                         Decimal.div(rewardsLevel.value, 12)
-                    )}x your current ${randomResource}.`;
+                    )}x your current ${randomResource} (no modifiers).`;
                     onComplete = () =>
                         main.grantResource(
                             randomResource,
@@ -1116,12 +1116,10 @@ export function createPlane(
             })),
             createMultiplicativeModifier(() => ({
                 multiplier: () =>
-                    Decimal.add(
-                        1,
-                        isEmpowered("coalRelic")
-                            ? Decimal.pow(earnedTreasures.value.length, 2)
-                            : earnedTreasures.value.length
-                    ),
+                    Decimal.times(
+                        isEmpowered("coalRelic") ? 0.5 : 0.25,
+                        earnedTreasures.value.length
+                    ).add(1),
                 description: () => (isEmpowered("coalRelic") ? "Empowered " : "") + relics.coal,
                 enabled: () => main.toolNodes.value.coalRelic != null
             }))

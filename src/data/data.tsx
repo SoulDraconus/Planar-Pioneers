@@ -279,7 +279,9 @@ export const passives = {
     },
     coalRelic: {
         description: (empowered: boolean) =>
-            empowered ? "(Treasures)^2 boost planar speed" : "Treasures boost planar speed"
+            empowered
+                ? "Every treasure boosts planar speed by +50%"
+                : "Every treasure boosts planar speed by +25%"
     },
     copperRelic: {
         description: (empowered: boolean) =>
