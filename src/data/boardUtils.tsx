@@ -19,6 +19,7 @@ import { ComputedRef } from "vue";
 export const resourceLevelFormula = Formula.variable(0)
     .step(100, x => x.pow(1.5))
     .step(Decimal.pow(900, 1.5).add(100), x => x.pow(1.5))
+    .step(Decimal.pow(1500, 1.5).pow(1.5).add(Decimal.pow(900, 1.5).add(100)), x => x.pow(2))
     .pow(1.5);
 
 export const deselectAllAction = {

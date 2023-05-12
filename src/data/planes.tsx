@@ -417,7 +417,9 @@ export function createPlane(
                             () => ({
                                 requirements: createCostRequirement(() => ({
                                     resource: noPersist(resource),
-                                    cost
+                                    cost,
+                                    maxBulkAmount: () =>
+                                        main.toolNodes.value.diamondRelic != null ? Decimal.dInf : 1
                                 })),
                                 display: () => ({
                                     title,
@@ -772,7 +774,9 @@ export function createPlane(
                             energy: j === 0 ? energy : undefined,
                             requirements: createCostRequirement(() => ({
                                 resource: noPersist(resource),
-                                cost
+                                cost,
+                                maxBulkAmount: () =>
+                                    isEmpowered("diamondRelic") != null ? Decimal.dInf : 1
                             })),
                             visibility: repeatableVisibility
                         }));
@@ -1139,7 +1143,7 @@ export function createPlane(
             createMultiplicativeModifier(() => ({
                 multiplier: () =>
                     Decimal.times(
-                        isEmpowered("coalRelic") ? 0.5 : 0.25,
+                        isEmpowered("coalRelic") ? 0.2 : 0.1,
                         earnedTreasures.value.length
                     ).add(1),
                 description: () => (isEmpowered("coalRelic") ? "Empowered " : "") + relics.coal,
