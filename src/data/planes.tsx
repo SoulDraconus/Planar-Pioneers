@@ -270,25 +270,25 @@ export function createPlane(
                                 }));
                                 break;
                             }
-                            case "pow": {
-                                const exponent = random() / 10 + 1.05;
-                                description = `Raise previous ${
-                                    resource.displayName
-                                } gain to the ^${format(exponent)}`;
-                                costFormula = costFormula
-                                    .add(Decimal.pow(cachedGain[currentN - 1], exponent))
-                                    .sub(cachedGain[currentN - 1]);
-                                modifier = condition =>
-                                    createExponentialModifier(() => ({
-                                        exponent,
-                                        description: title,
-                                        enabled:
-                                            condition == null
-                                                ? upgrade.bought
-                                                : () => condition() && upgrade.bought.value
-                                    }));
-                                previewModifier = createExponentialModifier(() => ({ exponent }));
-                            }
+                            // case "pow": {
+                            //     const exponent = random() / 10 + 1.05;
+                            //     description = `Raise previous ${
+                            //         resource.displayName
+                            //     } gain to the ^${format(exponent)}`;
+                            //     costFormula = costFormula
+                            //         .add(Decimal.pow(cachedGain[currentN - 1], exponent))
+                            //         .sub(cachedGain[currentN - 1]);
+                            //     modifier = condition =>
+                            //         createExponentialModifier(() => ({
+                            //             exponent,
+                            //             description: title,
+                            //             enabled:
+                            //                 condition == null
+                            //                     ? upgrade.bought
+                            //                     : () => condition() && upgrade.bought.value
+                            //         }));
+                            //     previewModifier = createExponentialModifier(() => ({ exponent }));
+                            // }
                         }
                         cachedGain[n.value] = costFormula.evaluate();
                         n.value++;
