@@ -212,10 +212,10 @@ export function createPlane(
             const featureWeights = {
                 upgrades: 32,
                 repeatables: i <= 1 ? 0 : 16,
-                conversion: i <= 3 ? 0 : 8,
-                xp: i <= 5 ? 0 : 4,
-                dimensions: i <= 7 ? 0 : 2,
-                prestige: i <= 7 || i >= length - 1 ? 0 : 1
+                conversion: i <= 2 ? 0 : 12,
+                xp: i <= 3 ? 0 : 8,
+                dimensions: i <= 4 ? 0 : 6,
+                prestige: i <= 5 || i >= length - 1 ? 0 : 4
             };
             const type = pickRandom(featureWeights, random);
             switch (type) {
