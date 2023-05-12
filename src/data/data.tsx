@@ -289,7 +289,7 @@ export const passives = {
     },
     ironRelic: {
         description: (empowered: boolean) =>
-            empowered ? "Conversions give triple output" : "Conversions give double output"
+            empowered ? "Conversions give quadruple output" : "Conversions give double output"
     },
     silverRelic: {
         description: (empowered: boolean) =>

@@ -473,7 +473,19 @@ export function createPlane(
                     const conversion = createCumulativeConversion(() => ({
                         baseResource: noPersist(resource),
                         gainResource: prestigeResource,
-                        formula: x => x.div(cost).pow(costExponent),
+                        formula: x =>
+                            x
+                                .div(cost)
+                                .pow(costExponent)
+                                .times(
+                                    computed(() =>
+                                        main.toolNodes.value.ironRelic != null
+                                            ? isEmpowered("ironRelic")
+                                                ? 4
+                                                : 2
+                                            : 1
+                                    )
+                                ),
                         spend() {
                             resource.value = 0;
                         }
