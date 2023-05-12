@@ -1458,7 +1458,8 @@ export function calculateMaxAffordable(
             }
             while (
                 Decimal.lt(affordable, maxBulkAmount) &&
-                Decimal.lt(affordable, Number.MAX_SAFE_INTEGER)
+                Decimal.lt(affordable, Number.MAX_SAFE_INTEGER) &&
+                Decimal.add(directSum, 1).gte(affordable)
             ) {
                 const nextCost = formula.evaluate(
                     affordable.add(unref(formula.innermostVariable) ?? 0)
