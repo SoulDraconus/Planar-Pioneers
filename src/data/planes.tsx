@@ -437,6 +437,7 @@ export function createPlane(
                                     showAmount: false
                                 }),
                                 visibility: repeatableVisibility,
+                                limit: 100,
                                 bonusAmount: () =>
                                     Decimal.gt(repeatable.amount.value, 0)
                                         ? isEmpowered("dirtRelic")
@@ -774,6 +775,7 @@ export function createPlane(
                             },
                             effect,
                             dimensions,
+                            limit: 100,
                             energy: j === 0 ? energy : undefined,
                             requirements: createCostRequirement(() => ({
                                 resource: noPersist(resource),
