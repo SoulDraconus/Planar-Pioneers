@@ -900,13 +900,23 @@ export const main = createLayer("main", function (this: BaseLayer) {
     );
 
     const activePortals = computed(() => board.types.portal.nodes.value.filter(n => isPowered(n)));
+    const sortedPortalTabs = computed(() =>
+        activePortals.value
+            .sort((a, b) => {
+                const aMinimized = layers[(a.state as unknown as PortalState).id]?.minimized.value
+                    ? 1
+                    : 0;
+                const bMinimized = layers[(b.state as unknown as PortalState).id]?.minimized.value
+                    ? 1
+                    : 0;
+                return aMinimized - bMinimized;
+            })
+            .map(node => (node.state as unknown as PortalState).id)
+    );
 
-    watch(activePortals, activePortals => {
+    watch(sortedPortalTabs, portalTabs => {
         nextTick(() => {
-            player.tabs = [
-                "main",
-                ...activePortals.map(node => (node.state as unknown as PortalState).id)
-            ];
+            player.tabs = ["main", ...portalTabs];
         });
     });
 
