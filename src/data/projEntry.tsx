@@ -198,11 +198,24 @@ export const main = createLayer("main", function (this: BaseLayer) {
             ).length
         );
     });
-    const nextPowerCost = computed(() =>
-        Decimal.eq(numPoweredMachines.value, 0)
+    const effectivePoweredMachines = computed(() => {
+        let numMachines = numPoweredMachines.value;
+        if (toolNodes.value.copperRelic != null) {
+            numMachines--;
+            if (isEmpowered("copperRelic")) {
+                numMachines--;
+            }
+        }
+        return numMachines;
+    });
+    const nextPowerCost = computed(() => {
+        const numMachines = effectivePoweredMachines.value;
+        return Decimal.lt(numMachines, 0)
+            ? 0
+            : Decimal.eq(numMachines, 0)
             ? 10
-            : Decimal.add(numPoweredMachines.value, 1).pow_base(100).div(10).times(0.99)
-    );
+            : Decimal.add(numMachines, 1).pow_base(100).div(10).times(0.99);
+    });
 
     const quarryProgressRequired = computed(() => {
         if (quarry.value == null) {
@@ -518,9 +531,9 @@ export const main = createLayer("main", function (this: BaseLayer) {
             enabled: () => Decimal.neq(planarMultis.value.energy ?? 1, 1)
         })),
         createAdditiveModifier(() => ({
-            addend: () => Decimal.pow(100, numPoweredMachines.value).div(10).neg(),
+            addend: () => Decimal.pow(100, effectivePoweredMachines.value).div(10).neg(),
             description: "Powered Machines (100^n/10 energy/s)",
-            enabled: () => Decimal.gt(numPoweredMachines.value, 0)
+            enabled: () => Decimal.gt(effectivePoweredMachines.value, 0)
         }))
     ]);
     const computedEnergyModifier = computed(() => energyModifier.apply(0));

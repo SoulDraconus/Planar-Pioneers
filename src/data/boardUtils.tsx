@@ -110,15 +110,15 @@ export function getIncreaseConnectionsAction(
             );
             if (Decimal.gte(main.energy.value, cost)) {
                 main.energy.value = Decimal.sub(main.energy.value, cost);
+                node.state = {
+                    ...(node.state as object),
+                    maxConnections: Decimal.add(
+                        (node.state as { maxConnections: number }).maxConnections,
+                        1
+                    )
+                };
+                main.board.selectedAction.value = null;
             }
-            node.state = {
-                ...(node.state as object),
-                maxConnections: Decimal.add(
-                    (node.state as { maxConnections: number }).maxConnections,
-                    1
-                )
-            };
-            main.board.selectedAction.value = null;
         },
         visibility: (node: BoardNode): boolean =>
             Decimal.add(

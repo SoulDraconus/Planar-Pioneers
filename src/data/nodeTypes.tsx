@@ -463,6 +463,9 @@ export const portalGenerator = {
                     ? { text: "Tap again to confirm" }
                     : { text: "Cannot afford", color: "var(--danger)" },
             onClick(node) {
+                if (Decimal.lt(main.energy.value, main.computedPortalCost.value)) {
+                    return;
+                }
                 let id = 0;
                 while (`portal-${id}` in layers) {
                     id++;
@@ -678,12 +681,12 @@ export const booster = {
                 );
                 if (Decimal.gte(main.energy.value, cost)) {
                     main.energy.value = Decimal.sub(main.energy.value, cost);
+                    node.state = {
+                        ...(node.state as object),
+                        level: Decimal.add((node.state as unknown as BoosterState).level, 1)
+                    };
+                    main.board.selectedAction.value = null;
                 }
-                node.state = {
-                    ...(node.state as object),
-                    level: Decimal.add((node.state as unknown as BoosterState).level, 1)
-                };
-                main.board.selectedAction.value = null;
             }
         },
         togglePoweredAction
