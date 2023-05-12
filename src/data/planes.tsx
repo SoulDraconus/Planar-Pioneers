@@ -121,33 +121,7 @@ export function createPlane(
         }
 
         const resourceModifiers: WithRequired<Modifier, "description" | "invert">[] = [];
-        const resourceGainModifier = createSequentialModifier(() => [
-            ...resourceModifiers,
-            createMultiplicativeModifier(() => ({
-                multiplier: () => (main.isEmpowered("silver") ? 4 : 2),
-                description: () =>
-                    (main.isEmpowered("silver") ? "Empowered " : "") + tools.silver.name,
-                enabled: () => main.toolNodes.value.silver != null
-            })),
-            createMultiplicativeModifier(() => ({
-                multiplier: () =>
-                    ((main.isEmpowered("diamond") ? 2 : 1) *
-                        upgrades.filter(u => u.bought.value).length) /
-                    10,
-                description: () =>
-                    (main.isEmpowered("diamond") ? "Empowered " : "") + tools.diamond.name,
-                enabled: () => main.toolNodes.value.diamond != null
-            })),
-            createMultiplicativeModifier(() => ({
-                multiplier: () =>
-                    Decimal.div(timeActive.value, 6000)
-                        .times(main.isEmpowered("emerald") ? 2 : 1)
-                        .add(1),
-                description: () =>
-                    (main.isEmpowered("emerald") ? "Empowered " : "") + tools.emerald.name,
-                enabled: () => main.toolNodes.value.emerald != null
-            }))
-        ]);
+        const resourceGainModifier = createSequentialModifier(() => resourceModifiers);
         const computedResourceGain = computed(() => resourceGainModifier.apply(0));
 
         const previews: {
@@ -1044,6 +1018,46 @@ export function createPlane(
             features as unknown as Record<string, unknown>,
             RepeatableType
         ) as GenericRepeatable[];
+
+        resourceModifiers.push(
+            createMultiplicativeModifier(() => ({
+                multiplier: () => (isEmpowered("silver") ? 4 : 2),
+                description: () => (isEmpowered("silver") ? "Empowered " : "") + tools.silver.name,
+                enabled: () => main.toolNodes.value.silver != null
+            })),
+            createMultiplicativeModifier(() => ({
+                multiplier: () =>
+                    ((isEmpowered("diamond") ? 2 : 1) *
+                        upgrades.filter(u => u.bought.value).length) /
+                    10,
+                description: () =>
+                    (isEmpowered("diamond") ? "Empowered " : "") + tools.diamond.name,
+                enabled: () => main.toolNodes.value.diamond != null
+            })),
+            createMultiplicativeModifier(() => ({
+                multiplier: () =>
+                    Decimal.div(timeActive.value, 6000)
+                        .times(isEmpowered("emerald") ? 2 : 1)
+                        .add(1),
+                description: () =>
+                    (isEmpowered("emerald") ? "Empowered " : "") + tools.emerald.name,
+                enabled: () => main.toolNodes.value.emerald != null
+            })),
+            createMultiplicativeModifier(() => ({
+                multiplier: () =>
+                    Decimal.div(
+                        repeatables.reduce(
+                            (acc, curr) => acc.add(curr.amount.value),
+                            Decimal.dZero
+                        ),
+                        100
+                    )
+                        .times(isEmpowered("gravelRelic") ? 2 : 1)
+                        .add(1),
+                description: () => (isEmpowered("gravelRelic") ? "Empowered " : "") + relics.gravel,
+                enabled: () => main.toolNodes.value.gravelRelic != null
+            }))
+        );
 
         const planarSpeedModifier = createSequentialModifier(() => [
             createMultiplicativeModifier(() => ({
