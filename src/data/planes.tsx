@@ -219,8 +219,8 @@ export function createPlane(
                     for (let j = 0; j < 4; j++) {
                         const upgradeTypeWeights = {
                             add: 1,
-                            mult: i === 0 && j === 0 ? 0 : 1,
-                            pow: i === 0 ? 0 : 0.5
+                            mult: i === 0 && j === 0 ? 0 : 1
+                            // pow: i === 0 ? 0 : 0.5
                         };
                         const upgradeType = pickRandom(upgradeTypeWeights, random);
                         const cost = nextCost.value;
