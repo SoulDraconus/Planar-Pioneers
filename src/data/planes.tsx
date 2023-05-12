@@ -884,7 +884,9 @@ export function createPlane(
             switch (treasureType) {
                 case "cache":
                     randomResource = getRandomResource(random, influences);
-                    description = `Gain ${format(rewardsLevel)}x your current ${randomResource}.`;
+                    description = `Gain ${format(
+                        Decimal.div(rewardsLevel, 12)
+                    )}x your current ${randomResource}.`;
                     onComplete = () =>
                         main.grantResource(
                             randomResource,
@@ -893,29 +895,27 @@ export function createPlane(
                                     main.resourceNodes.value[randomResource]
                                         ?.state as unknown as ResourceState | null
                                 )?.amount ?? 0,
-                                rewardsLevel
+                                Decimal.div(rewardsLevel, 12)
                             )
                         );
                     break;
                 case "generation":
                     randomResource = getRandomResource(random, influences);
-                    const gain = Decimal.div(rewardsLevel, 120).times(
-                        mineLootTable[randomResource]
-                    );
+                    const gain = Decimal.div(rewardsLevel, 40).times(mineLootTable[randomResource]);
                     description = `Gain ${format(gain)} ${randomResource}/s while plane is active.`;
                     update = diff => main.grantResource(randomResource, Decimal.times(diff, gain));
                     link = computed(() => main.resourceNodes.value[randomResource]);
                     break;
                 case "resourceMulti":
                     effectedResource = randomResource = getRandomResource(random, influences);
-                    resourceMulti = Decimal.div(rewardsLevel, 17).pow_base(2);
+                    resourceMulti = Decimal.div(rewardsLevel, 10).pow_base(2);
                     description = `Gain ${format(
                         resourceMulti
                     )}x ${randomResource} while plane is active.`;
                     break;
                 case "energyMulti":
                     effectedResource = "energy";
-                    resourceMulti = Decimal.div(rewardsLevel, 17).add(1);
+                    resourceMulti = Decimal.div(rewardsLevel, 8).add(1);
                     description = `Gain ${format(resourceMulti)}x energy while plane is active.`;
                     break;
                 case "influences":

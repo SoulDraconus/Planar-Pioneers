@@ -158,11 +158,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
                 () => resourceLevels.value[resource],
                 (level, prevLevel) => {
                     const diff = Decimal.sub(level, prevLevel);
-                    if (
-                        Decimal.gt(diff, 0) &&
-                        settings.active === player.id &&
-                        Decimal.lte(level, 100)
-                    ) {
+                    if (Decimal.gt(diff, 0) && settings.active === player.id) {
                         toast.info(
                             <div>
                                 <h3>
