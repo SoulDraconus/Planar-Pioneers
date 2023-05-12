@@ -657,10 +657,13 @@ export function createPlane(
                             ) &&
                             isVisible(bar.visibility)
                         ) {
-                            const totalDiff = Decimal.times(
-                                computedPlanarSpeedModifier.value,
-                                diff
-                            );
+                            let totalDiff = Decimal.times(computedPlanarSpeedModifier.value, diff);
+                            if (main.toolNodes.value.goldRelic != null) {
+                                totalDiff = Decimal.pow(
+                                    isEmpowered("goldRelic") ? 4 : 2,
+                                    earnedTreasures.value.length
+                                ).times(totalDiff);
+                            }
                             xp.value = Decimal.add(totalDiff, xp.value);
                         }
                     });
