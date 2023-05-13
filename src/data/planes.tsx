@@ -199,7 +199,7 @@ export function createPlane(
         const n = ref(0);
         // Makes cost formula value reactive on n, so nextCost will update as appropriate
         let costFormula = Formula.variable(n).times(0);
-        const cachedGain: Record<number, DecimalSource> = {};
+        let previousGain: DecimalSource = 0;
         let visibility: Computable<boolean> = true;
         const nextCost = computed(() =>
             Decimal.add(difficulty, random() - 0.5)
@@ -238,7 +238,7 @@ export function createPlane(
                         const currentN = n.value;
                         switch (upgradeType) {
                             case "add": {
-                                const addend = Decimal.add(cost, 10).pow(random() / 4 + 0.875);
+                                const addend = Decimal.add(cost, 10).pow(random() / 4 + 1);
                                 description = `Gain ${format(addend)} ${resource.displayName}/s`;
                                 costFormula = costFormula.add(addend);
                                 modifier = condition =>
@@ -258,8 +258,9 @@ export function createPlane(
                                 description = `Multiply previous ${
                                     resource.displayName
                                 } gain by x${format(multiplier)}.`;
+                                const prevGain = previousGain;
                                 costFormula = costFormula.add(
-                                    Decimal.sub(multiplier, 1).times(cachedGain[currentN - 1])
+                                    Decimal.sub(multiplier, 1).times(prevGain)
                                 );
                                 modifier = condition =>
                                     createMultiplicativeModifier(() => ({
@@ -281,8 +282,8 @@ export function createPlane(
                             //         resource.displayName
                             //     } gain to the ^${format(exponent)}`;
                             //     costFormula = costFormula
-                            //         .add(Decimal.pow(cachedGain[currentN - 1], exponent))
-                            //         .sub(cachedGain[currentN - 1]);
+                            //         .add(Decimal.pow(prevGain, exponent))
+                            //         .sub(prevGain);
                             //     modifier = condition =>
                             //         createExponentialModifier(() => ({
                             //             exponent,
@@ -295,7 +296,7 @@ export function createPlane(
                             //     previewModifier = createExponentialModifier(() => ({ exponent }));
                             // }
                         }
-                        cachedGain[n.value] = costFormula.evaluate();
+                        previousGain = costFormula.evaluate();
                         n.value++;
                         const upgradeVisibility = visibility;
                         const upgrade = createUpgrade(() => ({
@@ -354,10 +355,15 @@ export function createPlane(
                             case "add": {
                                 const addend = Decimal.add(initialCost, 10).times(random() + 0.5);
                                 description = `Gain ${format(addend)} ${resource.displayName}/s`;
-                                cost = costInput.add(1).times(1.5).times(initialCost);
+                                cost = costInput.times(1.5).add(1).times(initialCost);
                                 costFormula = costFormula.add(
                                     computed(() =>
-                                        Decimal.sub(n.value, currentN).add(1).times(5).times(addend)
+                                        Decimal.sub(n.value, currentN)
+                                            .times(2)
+                                            .add(1)
+                                            .pow(2)
+                                            .clampMax(100)
+                                            .times(addend)
                                     )
                                 );
                                 effect = computed(
@@ -389,14 +395,17 @@ export function createPlane(
                                 cost = costInput
                                     .pow_base(Decimal.times(multiplier, 1.5))
                                     .times(initialCost);
+                                const prevGain = previousGain;
                                 costFormula = costFormula.add(
                                     computed(() =>
                                         Decimal.sub(n.value, currentN)
+                                            .times(2)
                                             .add(1)
-                                            .times(5)
+                                            .pow(2)
+                                            .clampMax(100)
                                             .pow_base(multiplier)
                                             .sub(1)
-                                            .times(cachedGain[currentN - 1])
+                                            .times(prevGain)
                                     )
                                 );
                                 effect = computed(
@@ -422,7 +431,7 @@ export function createPlane(
                                 break;
                             }
                         }
-                        cachedGain[n.value] = costFormula.evaluate();
+                        previousGain = costFormula.evaluate();
                         n.value++;
                         const repeatableVisibility = visibility;
                         const repeatable = createRepeatable<
@@ -474,19 +483,17 @@ export function createPlane(
                     }
                     features.push(repeatables);
                     break;
-                case "conversion":
+                case "conversion": {
                     const prestigeResource = createResource(0, getName(random));
                     const prestigeColor = getColor([0.64, 0.75, 0.55], random);
                     const cost = nextCost.value;
                     const costExponent = random() / 2 + 0.25; // Random from 0.25 - 0.75
                     const effectExponent = random() / 2 + 0.25; // ditto
                     const currentN = n.value;
+                    const prevGain = previousGain;
                     costFormula = costFormula.add(
                         computed(() =>
-                            Decimal.sub(n.value, currentN)
-                                .add(1)
-                                .pow10()
-                                .times(cachedGain[currentN - 1])
+                            Decimal.sub(n.value, currentN).add(1).times(2).pow10().times(prevGain)
                         )
                     );
                     const conversion = createCumulativeConversion(() => ({
@@ -509,8 +516,8 @@ export function createPlane(
                             resource.value = 0;
                         }
                     }));
-                    cachedGain[n.value] = costFormula.evaluate();
-                    n.value += 4;
+                    previousGain = costFormula.evaluate();
+                    n.value += 2;
                     const clickableVisibility = visibility;
                     const title = getPowerName(random);
                     const formula = Formula.variable(prestigeResource).pow(effectExponent).add(1);
@@ -610,17 +617,18 @@ export function createPlane(
                         (
                             main.investments.value.state as unknown as InvestmentsState
                         ).portals.includes(id)
-                            ? 0.01
+                            ? Decimal.div(computedPlanarSpeedModifier.value, 100)
                             : 0
                     );
                     break;
+                }
                 case "xp": {
                     const xp = createResource<DecimalSource>(0);
                     const barVisibility = visibility;
                     const currentN = n.value;
                     const title = getPowerName(random);
                     const cost = Decimal.add(difficulty, random() - 0.5)
-                        .pow_base(2)
+                        .pow_base(1.25)
                         .times(10);
                     const levelDifficulty = random() / 4 + 1.125; // 1.125 - 1.375
                     const effectExponent = random() / 2 + 1.25; // 1.25 - 1.75
@@ -638,18 +646,19 @@ export function createPlane(
                         description: title,
                         enabled: () => isVisible(bar.visibility)
                     }));
+                    const prevGain = previousGain;
                     costFormula = costFormula.add(
                         computed(() =>
                             Decimal.sub(n.value, currentN)
                                 .add(1)
                                 .times(3)
                                 .pow(effectExponent)
-                                .times(cachedGain[currentN - 1])
+                                .times(prevGain)
                         )
                     );
-                    cachedGain[n.value] = costFormula.evaluate();
+                    previousGain = costFormula.evaluate();
                     n.value += 3;
-                    const barColor = getColor([0.18, 0.2, 0.25], random);
+                    const barColor = getColor([0.64, 0.75, 0.55], random);
                     const bar = createBar(() => ({
                         direction: Direction.Right,
                         width: 300,
@@ -665,7 +674,8 @@ export function createPlane(
                                 {format(xp.value)}/{format(xpToNextLevel.value)}
                             </span>
                         )),
-                        fillStyle: `background-color: ${barColor}`
+                        fillStyle: `background-color: ${barColor}`,
+                        textStyle: `text-shadow: 5px 0 10px black`
                     }));
                     this.on("preUpdate", diff => {
                         if (
@@ -678,7 +688,7 @@ export function createPlane(
                             let totalDiff = Decimal.times(computedPlanarSpeedModifier.value, diff);
                             if (main.toolNodes.value.goldRelic != null) {
                                 totalDiff = Decimal.times(
-                                    isEmpowered("goldRelic") ? 0.2 : 0.1,
+                                    isEmpowered("goldRelic") ? 0.5 : 0.25,
                                     earnedTreasures.value.length
                                 )
                                     .add(1)
@@ -709,6 +719,7 @@ export function createPlane(
                     const energy = createResource<DecimalSource>(0, title + " energy");
                     const energyColor = getColor([0.64, 0.75, 0.55], random);
                     const currentN = n.value;
+                    const prevGain = previousGain;
                     costFormula = costFormula.add(
                         computed(() =>
                             Decimal.sub(n.value, currentN)
@@ -717,7 +728,7 @@ export function createPlane(
                                 .add(1)
                                 .log2()
                                 .add(1)
-                                .times(cachedGain[currentN - 1])
+                                .times(prevGain)
                         )
                     );
                     const effect = computed(() => Decimal.add(energy.value, 1).log2().add(1));
@@ -825,7 +836,7 @@ export function createPlane(
                             display: eta,
                             direction: Direction.Down
                         });
-                        cachedGain[n.value] = costFormula.evaluate();
+                        previousGain = costFormula.evaluate();
                         n.value++;
                     }
                     this.on("preUpdate", diff => {
@@ -882,7 +893,7 @@ export function createPlane(
                 case "prestige": {
                     const title = getPowerName(random);
                     const upgradeVisibility = visibility;
-                    const effectExponent = random() / 2 + 1.25; // 1.25 - 1.75
+                    const effectExponent = random() / 10 + 1.1; // 1.1 - 1.2
                     const cost = nextCost.value;
                     costFormula = costFormula.pow(effectExponent);
                     const modifier = createExponentialModifier(() => ({
@@ -890,10 +901,11 @@ export function createPlane(
                         description: title,
                         enabled: upgrade.bought
                     }));
-                    cachedGain[n.value] = costFormula.evaluate();
-                    n.value++;
+                    previousGain = costFormula.evaluate();
+                    n.value += 20;
+                    const thingsToReset = features.filter((f, i) => i % 2 === 0);
                     const reset = createReset(() => ({
-                        thingsToReset: features.filter((f, i) => i % 2 === 0),
+                        thingsToReset,
                         onReset() {
                             resource.value = 0;
                         }
@@ -924,7 +936,7 @@ export function createPlane(
                         canClick: () => unref(upgrade.canPurchase),
                         modifier,
                         cost,
-                        previewCost: resource,
+                        previewCost: noPersist(resource),
                         previewModifier,
                         showETA: () => !unref(upgrade.bought)
                     });
@@ -1084,7 +1096,8 @@ export function createPlane(
                 direction: Direction.Down
             });
             features.push([milestone]);
-            visibility = milestone.earned;
+            // Wrap milestone.earned so it doesn't get reset
+            visibility = computed(() => milestone.earned.value);
         }
 
         const upgrades = findFeatures(
@@ -1137,6 +1150,16 @@ export function createPlane(
                         .pow(0.75),
                 description: () => (isEmpowered("gravelRelic") ? "Empowered " : "") + relics.gravel,
                 enabled: () => main.toolNodes.value.gravelRelic != null
+            })),
+            createMultiplicativeModifier(() => ({
+                multiplier: () =>
+                    Decimal.add(main.energy.value, 1)
+                        .log10()
+                        .add(1)
+                        .pow(isEmpowered("beryliumRelic") ? 0.5 : 0.25),
+                description: () =>
+                    (isEmpowered("beryliumRelic") ? "Empowered " : "") + relics.berylium,
+                enabled: () => main.toolNodes.value.beryliumRelic != null
             }))
         );
 
@@ -1167,16 +1190,6 @@ export function createPlane(
                     ).add(1),
                 description: () => (isEmpowered("coalRelic") ? "Empowered " : "") + relics.coal,
                 enabled: () => main.toolNodes.value.coalRelic != null
-            })),
-            createMultiplicativeModifier(() => ({
-                multiplier: () =>
-                    Decimal.add(main.energy.value, 1)
-                        .log10()
-                        .add(1)
-                        .pow(isEmpowered("beryliumRelic") ? 0.5 : 0.25),
-                description: () =>
-                    (isEmpowered("beryliumRelic") ? "Empowered " : "") + relics.berylium,
-                enabled: () => main.toolNodes.value.beryliumRelic != null
             }))
         ]);
         const computedPlanarSpeedModifier = computed(() => planarSpeedModifier.apply(1));
