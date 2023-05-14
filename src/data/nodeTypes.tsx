@@ -58,7 +58,7 @@ import { exponentialFormat } from "util/bignum";
 export const mine = {
     shape: Shape.Diamond,
     size: 50,
-    title: "🪨",
+    title: "⛏️",
     label: node =>
         node === main.board.selectedNode.value
             ? { text: "Mining" }
@@ -352,7 +352,7 @@ export const dowsing = {
 export const quarry = {
     shape: Shape.Diamond,
     size: 50,
-    title: "⛏️",
+    title: "⛰️",
     label: node => {
         if (node === main.board.selectedNode.value) {
             return {

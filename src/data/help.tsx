@@ -34,7 +34,7 @@ export function getMineHelp() {
                 <p>
                     Welcome to Planar Pioneers! Your job is to gather resources and eventually
                     explore and conquer increasingly difficult "planes", which are like alien
-                    worlds. To start you'll use the mine (🪨) machine to gather resources.
+                    worlds. To start you'll use the mine (⛏️) machine to gather resources.
                 </p>
                 <br />
                 <p>
@@ -103,7 +103,7 @@ export function getQuarryHelp() {
         jsx(() => (
             <div>
                 <p>
-                    You've created the Quarry (⛏️)! This machine let's you gather specified
+                    You've created the Quarry (⛰️)! This machine let's you gather specified
                     resources. Unlike the mine, this machine will always output the same resources.
                     However, rarer resources will take longer to gather.
                 </p>
