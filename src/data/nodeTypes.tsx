@@ -590,6 +590,21 @@ export const portalGenerator = {
         }
         main.board.selectedNode.value = node;
     },
+    progress: node =>
+        (node.state as unknown as PortalGeneratorState).tier == null
+            ? 0
+            : Decimal.div(
+                  Decimal.sqrt(main.energy.value),
+                  Decimal.sqrt(main.computedPortalCost.value)
+              )
+                  .clampMax(1)
+                  .toNumber(),
+    progressDisplay: ProgressDisplay.Fill,
+    progressColor: node =>
+        (node.state as unknown as PortalGeneratorState).tier != null &&
+        Decimal.gte(main.energy.value, main.computedPortalCost.value)
+            ? "var(--accent2)"
+            : "var(--foreground)",
     draggable: true
 } as NodeTypeOptions;
 
