@@ -19,7 +19,7 @@ import {
     createMultiplicativeModifier,
     createSequentialModifier
 } from "game/modifiers";
-import { State } from "game/persistence";
+import { DefaultValue, State } from "game/persistence";
 import type { LayerData, Player } from "game/player";
 import player from "game/player";
 import settings from "game/settings";
@@ -78,6 +78,7 @@ import {
     upgrader
 } from "./nodeTypes";
 import { GenericPlane, createPlane } from "./planes";
+import { getMineHelp } from "./help";
 
 const toast = useToast();
 
@@ -772,6 +773,12 @@ export const main = createLayer("main", function (this: BaseLayer) {
         />
     ));
 
+    const helpModals = {
+        mine: getMineHelp()
+    };
+    helpModals.mine.showModal[DefaultValue] = true;
+    helpModals.mine.showModal.value = true;
+
     this.on("preUpdate", diff => {
         Object.keys(resourceMinedCooldown).forEach(resource => {
             // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
@@ -1011,6 +1018,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
                 </StickyVue>
                 {render(board)}
                 {render(modifiersModal)}
+                {Object.values(helpModals).map(({ modal }) => modal())}
             </>
         ))
     };
