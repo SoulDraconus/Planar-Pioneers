@@ -1,6 +1,11 @@
 import Modal from "components/Modal.vue";
 import { JSXFunction, jsx } from "features/feature";
-import { persistent } from "game/persistence";
+import { Persistent, persistent } from "game/persistence";
+
+export interface ModalData {
+    modal: JSXFunction;
+    showModal: Persistent<boolean>;
+}
 
 function createModal(title: string, body: JSXFunction) {
     const showModal = persistent<boolean>(false);
@@ -62,6 +67,26 @@ export function getForgeHelp() {
                     Drag a resource onto the forge to select that resource tier. You can then use an
                     action on the forge to create that item, at the cost of energy based on the
                     resource tier. You can only have 1 of each item.
+                </p>
+            </div>
+        ))
+    );
+}
+
+export function getDowsingHelp() {
+    return createModal(
+        "Dowsing",
+        jsx(() => (
+            <div>
+                <p>
+                    You've created the dowsing rod (🥢)! This machine let's you bias the odds of
+                    specified resources from mining. It will double the odds of each specified
+                    resource, so keep in mind rare resources will still be fairly rare.
+                </p>
+                <br />
+                <p>
+                    Specify resources to boost by dragging them to the dowsing rod. You can only
+                    select a single resource to start, but that can be increased using an action.
                 </p>
             </div>
         ))

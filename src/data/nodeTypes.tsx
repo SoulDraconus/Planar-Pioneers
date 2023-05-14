@@ -54,6 +54,7 @@ import {
 import { GenericPlane, createPlane } from "./planes";
 import { main } from "./projEntry";
 import { exponentialFormat } from "util/bignum";
+import { ModalData } from "./help";
 
 export const mine = {
     shape: Shape.Diamond,
@@ -186,6 +187,11 @@ export const factory = {
                     main.board.selectedAction.value = null;
                     main.board.selectedNode.value = null;
                     node.state = undefined;
+                    if (tool.type in main.helpModals) {
+                        main.helpModals[
+                            tool.type as keyof (typeof main)["helpModals"]
+                        ].showModal.value = true;
+                    }
                 }
             },
             fillColor: node =>
@@ -335,7 +341,8 @@ export const dowsing = {
     actions: [
         deselectAllAction,
         getIncreaseConnectionsAction(x => x.add(2).pow_base(100), 16),
-        togglePoweredAction
+        togglePoweredAction,
+        showHelpAction("dowsing")
     ],
     classes: node => ({
         running: isPowered(node)
