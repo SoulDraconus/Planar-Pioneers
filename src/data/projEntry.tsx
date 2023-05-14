@@ -58,7 +58,14 @@ import {
     resourceNames,
     tools
 } from "./data";
-import { getDowsingHelp, getEmpowererHelp, getForgeHelp, getMineHelp, getQuarryHelp } from "./help";
+import {
+    getDowsingHelp,
+    getEmpowererHelp,
+    getForgeHelp,
+    getMineHelp,
+    getPortalHelp,
+    getQuarryHelp
+} from "./help";
 import "./main.css";
 import {
     automator,
@@ -778,7 +785,8 @@ export const main = createLayer("main", function (this: BaseLayer) {
         factory: getForgeHelp(),
         dowsing: getDowsingHelp(),
         quarry: getQuarryHelp(),
-        empowerer: getEmpowererHelp()
+        empowerer: getEmpowererHelp(),
+        portalGenerator: getPortalHelp()
     };
     helpModals.mine.showModal[DefaultValue] = true;
     helpModals.mine.showModal.value = true;

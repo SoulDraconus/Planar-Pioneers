@@ -1,13 +1,16 @@
 import Modal from "components/Modal.vue";
 import { JSXFunction, jsx } from "features/feature";
+import { createTab } from "features/tabs/tab";
+import { createTabFamily } from "features/tabs/tabFamily";
 import { Persistent, persistent } from "game/persistence";
+import { renderJSX } from "util/vue";
 
 export interface ModalData {
     modal: JSXFunction;
     showModal: Persistent<boolean>;
 }
 
-function createModal(title: string, body: JSXFunction) {
+function createModal(title: string, body: JSXFunction, otherData = {}) {
     const showModal = persistent<boolean>(false);
     const modal = jsx(() => (
         <Modal
@@ -19,7 +22,7 @@ function createModal(title: string, body: JSXFunction) {
             }}
         />
     ));
-    return { modal, showModal };
+    return { modal, showModal, ...otherData };
 }
 
 export function getMineHelp() {
@@ -130,5 +133,158 @@ export function getEmpowererHelp() {
                 </p>
             </div>
         ))
+    );
+}
+
+export function getPortalHelp() {
+    const tabFamily = createTabFamily({
+        general: () => ({
+            display: "General",
+            glowColor(): string {
+                return tabFamily.activeTab.value === this.tab ? "white" : "";
+            },
+            tab: createTab(() => ({
+                display: jsx(() => (
+                    <div>
+                        <p>
+                            You've created the Portal Generator (⛩️)! This machine let's you create
+                            portals to other planes, which will have treasures that help you in
+                            various ways! To create a portal you need to specify a tier by dragging
+                            a resource to the generator - higher tier planes cost more energy to
+                            generate portals for, but offer more and better treasures! Keep in mind
+                            time in planes will be paused if the portal is inactive (not selected
+                            nor powered).
+                        </p>
+                    </div>
+                ))
+            }))
+        }),
+        treasures: () => ({
+            display: "Treasures",
+            glowColor(): string {
+                return tabFamily.activeTab.value === this.tab ? "white" : "";
+            },
+            tab: createTab(() => ({
+                display: jsx(() => (
+                    <div>
+                        Types of potential treasures:
+                        <ul style="list-style-type: unset">
+                            <li style="margin-top: var(--feature-margin)">
+                                <b style="color: var(--bought)">Caches</b>: Gain an amount of a
+                                resource based on your current amount.
+                            </li>
+                            <li style="margin-top: var(--feature-margin)">
+                                <b style="color: var(--bought)">Gen</b>: Passively gain an amount of
+                                a resource while the portal is active (selected or powered).
+                            </li>
+                            <li style="margin-top: var(--feature-margin)">
+                                <b style="color: var(--bought)">Resource Mult</b>: Increase the
+                                amount gained of a resource from all sources (except caches) while
+                                the portal is active (selected or powered).
+                            </li>
+                            <li style="margin-top: var(--feature-margin)">
+                                <b style="color: var(--bought)">Energy Mult</b>: Increase the energy
+                                gained per second while the portal is active (selected or powered).
+                            </li>
+                            <li style="margin-top: var(--feature-margin)">
+                                <b style="color: var(--bought)">Influences</b>: Gain a influence.
+                                See the influences tab for details. You can only have 1 of each
+                                influence.
+                            </li>
+                            <li style="margin-top: var(--feature-margin)">
+                                <b style="color: var(--bought)">Relic</b>: Gain the relic unique to
+                                this tier of plane. These are powerful passive boosts that can be
+                                empowered. You can only have 1 of each relic. Relics can only appear
+                                with the +relic influence, and will always be the last treasure on a
+                                plane.
+                            </li>
+                        </ul>
+                    </div>
+                ))
+            }))
+        }),
+        influences: () => ({
+            display: "Influences",
+            glowColor(): string {
+                return tabFamily.activeTab.value === this.tab ? "white" : "";
+            },
+            tab: createTab(() => ({
+                display: jsx(() => (
+                    <div>
+                        <p>
+                            Some treasures will grant you influences that can help the portal
+                            generator create portals to planes with specified qualities. Each
+                            influence will multiply the energy cost of creating the portal.
+                        </p>
+                        <br />
+                        Influences:
+                        <ul style="list-style-type: unset">
+                            <li style="margin-top: var(--feature-margin)">
+                                <b style="color: var(--bought)">+resource</b>: Can be connected to
+                                resources and will cause any treasures that reference resources
+                                (caches, gens, and resource mults) to have increased odds of picking
+                                a selected resource.
+                            </li>
+                            <li style="margin-top: var(--feature-margin)">
+                                <b style="color: var(--bought)">-resource</b>: Can be connected to
+                                resources and will cause any treasures that reference resources
+                                (caches, gens, and resource mults) to have decreased odds of picking
+                                a selected resource.
+                            </li>
+                            <li style="margin-top: var(--feature-margin)">
+                                <b style="color: var(--bought)">+length</b>: Cause the plane to have
+                                1 extra treasure than it otherwise would have.
+                            </li>
+                            <li style="margin-top: var(--feature-margin)">
+                                <b style="color: var(--bought)">+caches</b>: Causes treasures to
+                                have an increased chance to be caches.
+                            </li>
+                            <li style="margin-top: var(--feature-margin)">
+                                <b style="color: var(--bought)">+gens</b>: Causes treasures to have
+                                an increased chance to be gens.
+                            </li>
+                            <li style="margin-top: var(--feature-margin)">
+                                <b style="color: var(--bought)">+resource mults</b>: Causes
+                                treasures to have an increased chance to be resource mults.
+                            </li>
+                            <li style="margin-top: var(--feature-margin)">
+                                <b style="color: var(--bought)">+energy mults</b>: Causes treasures
+                                to have an increased chance to be energy mults.
+                            </li>
+                            <li style="margin-top: var(--feature-margin)">
+                                <b style="color: var(--bought)">+influences</b>: Causes treasures to
+                                have an increased chance to be influences.
+                            </li>
+                            <li style="margin-top: var(--feature-margin)">
+                                <b style="color: var(--bought)">+relic</b>: Maximizes length and
+                                difficulty for this tier of plane, and makes the last treasure a
+                                relic (unique per tier of plane). Overrides any other
+                                difficulty-changing influences.
+                            </li>
+                            <li style="margin-top: var(--feature-margin)">
+                                <b style="color: var(--bought)">+difficulty</b>: Causes the
+                                difficulty and rewards to be in the upper half of what's possible at
+                                this tier.
+                            </li>
+                            <li style="margin-top: var(--feature-margin)">
+                                <b style="color: var(--bought)">-difficulty</b>: Causes the
+                                difficulty and rewards to be in the lower half of what's possible at
+                                this tier.
+                            </li>
+                            <li style="margin-top: var(--feature-margin)">
+                                <b style="color: var(--bought)">+rewards</b>: Causes the quality of
+                                treasures to be 1 tier higher. Does not affect influences or relics
+                                treasures.
+                            </li>
+                        </ul>
+                    </div>
+                ))
+            }))
+        })
+    });
+    return createModal(
+        "Portal Generator",
+        jsx(() => renderJSX(tabFamily)),
+        { tabFamily }
     );
 }

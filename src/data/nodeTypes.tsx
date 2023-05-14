@@ -564,7 +564,8 @@ export const portalGenerator = {
                 node.state = { tier: undefined, influences: [] };
             },
             visibility: node => (node.state as unknown as PortalGeneratorState).tier != null
-        }
+        },
+        showHelpAction("portalGenerator")
     ],
     canAccept(node, otherNode) {
         return (

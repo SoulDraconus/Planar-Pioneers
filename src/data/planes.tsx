@@ -986,7 +986,7 @@ export function createPlane(
             switch (treasureType) {
                 case "cache":
                     randomResource = getRandomResource(random, influences);
-                    description = `Gain ${format(
+                    description = `Cache: Gain ${format(
                         Decimal.div(rewardsLevel.value, 12)
                     )}x your current ${randomResource} (no modifiers).`;
                     onComplete = () =>
@@ -1006,28 +1006,32 @@ export function createPlane(
                     const gain = Decimal.div(rewardsLevel.value, 40).times(
                         mineLootTable[randomResource]
                     );
-                    description = `Gain ${format(gain)} ${randomResource}/s while plane is active.`;
+                    description = `Gen: Gain ${format(
+                        gain
+                    )} ${randomResource}/s while plane is active.`;
                     update = diff => main.grantResource(randomResource, Decimal.times(diff, gain));
                     link = computed(() => main.resourceNodes.value[randomResource]);
                     break;
                 case "resourceMulti":
                     effectedResource = randomResource = getRandomResource(random, influences);
                     resourceMulti = Decimal.div(rewardsLevel.value, 10).pow_base(2);
-                    description = `Gain ${format(
+                    description = `Resource Mult: Gain ${format(
                         resourceMulti
                     )}x ${randomResource} while plane is active.`;
                     break;
                 case "energyMulti":
                     effectedResource = "energy";
                     resourceMulti = Decimal.div(rewardsLevel.value, 8).add(1);
-                    description = `Gain ${format(resourceMulti)}x energy while plane is active.`;
+                    description = `Energy Mult: Gain ${format(
+                        resourceMulti
+                    )}x energy while plane is active.`;
                     break;
                 case "influences":
                     const randomInfluence = (Object.keys(influenceTypes) as Influences[])[
                         Math.floor(random() * Object.keys(influenceTypes).length)
                     ];
                     influenceTreasures.push(randomInfluence);
-                    description = `Gain a portal influence (${influenceTypes[randomInfluence].display})`;
+                    description = `Influence: Gain a portal influence (${influenceTypes[randomInfluence].display})`;
                     onComplete = () => {
                         if (randomInfluence in main.influenceNodes.value) {
                             toast.warning(
@@ -1057,7 +1061,7 @@ export function createPlane(
                     description =
                         tier === "ultimatum"
                             ? "Win the game!"
-                            : `Gain the ${tier}-tier planar relic (${relics[tier]})`;
+                            : `Relic: Gain the ${tier}-tier planar relic (${relics[tier]})`;
                     onComplete = () => {
                         if (tier === "ultimatum") {
                             hasWon.value = true;
