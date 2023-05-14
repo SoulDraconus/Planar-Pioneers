@@ -118,7 +118,12 @@ export const factory = {
             const resource = (
                 (main.board as GenericBoard).draggingNode.value?.state as unknown as ResourceState
             ).type;
-            const text = node.state === resource ? "Disconnect" : tools[resource].name;
+            const text =
+                node.state === resource
+                    ? "Disconnect"
+                    : main.toolNodes.value[resource] == null
+                    ? tools[resource].name
+                    : "Already crafted";
             const color =
                 node.state === resource || main.toolNodes.value[resource] == null
                     ? "var(--accent2)"
@@ -209,7 +214,13 @@ export const factory = {
             ? "var(--accent2)"
             : "var(--foreground)",
     canAccept(node, otherNode) {
-        return otherNode.type === "resource";
+        if (otherNode.type !== "resource") {
+            return false;
+        }
+        const resource = (
+            (main.board as GenericBoard).draggingNode.value?.state as unknown as ResourceState
+        ).type;
+        return main.toolNodes.value[resource] == null;
     },
     onDrop(node, otherNode) {
         const droppedType = (otherNode.state as unknown as ResourceState).type;
