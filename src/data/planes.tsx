@@ -390,7 +390,7 @@ export function createPlane(
                                 description = `Multiply previous ${
                                     resource.displayName
                                 } gain by x${format(multiplier)}.`;
-                                cost = costInput.add(1).times(initialCost);
+                                cost = costInput.add(1).pow_base(multiplier).times(initialCost);
                                 const prevGain = previousGain;
                                 costFormula = costFormula.add(
                                     computed(() =>
