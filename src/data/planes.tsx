@@ -33,12 +33,7 @@ import Formula, {
     calculateMaxAffordable,
     unrefFormulaSource
 } from "game/formulas/formulas";
-import {
-    FormulaSource,
-    GenericFormula,
-    InvertibleFormula,
-    InvertibleIntegralFormula
-} from "game/formulas/types";
+import { FormulaSource, InvertibleFormula, InvertibleIntegralFormula } from "game/formulas/types";
 import { BaseLayer, GenericLayer, createLayer } from "game/layers";
 import {
     Modifier,
@@ -235,7 +230,6 @@ export function createPlane(
                             condition?: () => boolean
                         ) => WithRequired<Modifier, "description" | "invert">;
                         let previewModifier: WithRequired<Modifier, "invert">;
-                        const currentN = n.value;
                         switch (upgradeType) {
                             case "add": {
                                 const addend = Decimal.add(cost, 10).pow(random() / 4 + 1);
@@ -302,7 +296,8 @@ export function createPlane(
                         const upgrade = createUpgrade(() => ({
                             requirements: createCostRequirement(() => ({
                                 resource: noPersist(resource),
-                                cost
+                                cost,
+                                requiresPay: () => main.toolNodes.value.unobtainiumRelic == null
                             })),
                             display: {
                                 title,
@@ -315,6 +310,9 @@ export function createPlane(
                             canClick: () => upgrade.canPurchase.value,
                             modifier: modifier(),
                             cost,
+                            previewCost: computed(() =>
+                                main.toolNodes.value.unobtainiumRelic == null ? cost : 0
+                            ),
                             showETA: () => !upgrade.bought.value,
                             previewModifier
                         });
@@ -355,7 +353,7 @@ export function createPlane(
                             case "add": {
                                 const addend = Decimal.add(initialCost, 10).times(random() + 0.5);
                                 description = `Gain ${format(addend)} ${resource.displayName}/s`;
-                                cost = costInput.times(1.5).add(1).times(initialCost);
+                                cost = costInput.add(1).times(initialCost);
                                 costFormula = costFormula.add(
                                     computed(() =>
                                         Decimal.sub(n.value, currentN)
@@ -392,9 +390,7 @@ export function createPlane(
                                 description = `Multiply previous ${
                                     resource.displayName
                                 } gain by x${format(multiplier)}.`;
-                                cost = costInput
-                                    .pow_base(Decimal.times(multiplier, 1.5))
-                                    .times(initialCost);
+                                cost = costInput.add(1).times(initialCost);
                                 const prevGain = previousGain;
                                 costFormula = costFormula.add(
                                     computed(() =>
@@ -442,7 +438,10 @@ export function createPlane(
                                     resource: noPersist(resource),
                                     cost,
                                     maxBulkAmount: () =>
-                                        main.toolNodes.value.diamondRelic != null ? Decimal.dInf : 1
+                                        main.toolNodes.value.diamondRelic != null
+                                            ? Decimal.dInf
+                                            : 1,
+                                    requiresPay: () => main.toolNodes.value.unobtainiumRelic == null
                                 })),
                                 display: () => ({
                                     title,
@@ -473,10 +472,13 @@ export function createPlane(
                             feature: repeatable,
                             canClick: () => unref(repeatable.canClick),
                             modifier,
-                            cost: computed(() =>
-                                calculateCost(cost, repeatable.amountToIncrease.value)
-                            ),
+                            cost,
                             previewModifier,
+                            previewCost: computed(() =>
+                                main.toolNodes.value.unobtainiumRelic == null
+                                    ? calculateCost(cost, repeatable.amountToIncrease.value)
+                                    : 0
+                            ),
                             showETA: () => !repeatable.maxed.value
                         });
                         repeatables.push(repeatable);
@@ -806,7 +808,8 @@ export function createPlane(
                                 resource: noPersist(resource),
                                 cost,
                                 maxBulkAmount: () =>
-                                    isEmpowered("diamondRelic") != null ? Decimal.dInf : 1
+                                    isEmpowered("diamondRelic") != null ? Decimal.dInf : 1,
+                                requiresPay: () => !isEmpowered("unobtainiumRelic")
                             })),
                             visibility: repeatableVisibility
                         }));
@@ -827,7 +830,11 @@ export function createPlane(
                         const preview = createFormulaPreview(previewFormula, shouldShowPreview);
                         previews.push({
                             shouldShowPreview,
-                            cost
+                            cost: computed(() =>
+                                isEmpowered("unobtainiumRelic")
+                                    ? 0
+                                    : calculateCost(cost, clickable.amountToIncrease.value)
+                            )
                         });
                         const eta = estimateTime(resource, computedResourceGain, () =>
                             unrefFormulaSource(cost)
@@ -921,11 +928,16 @@ export function createPlane(
                             width: "200px",
                             minHeight: "100px"
                         },
-                        onPurchase: reset.reset,
+                        onPurchase: () => {
+                            if (!isEmpowered("unobtainiumRelic")) {
+                                reset.reset();
+                            }
+                        },
                         visibility: upgradeVisibility,
                         requirements: createCostRequirement(() => ({
                             resource: noPersist(resource),
-                            cost
+                            cost,
+                            requiresPay: false
                         }))
                     }));
                     const previewModifier = createMultiplicativeModifier(() => ({
@@ -936,7 +948,9 @@ export function createPlane(
                         canClick: () => unref(upgrade.canPurchase),
                         modifier,
                         cost,
-                        previewCost: noPersist(resource),
+                        previewCost: computed(() =>
+                            isEmpowered("unobtainiumRelic") ? 0 : resource.value
+                        ),
                         previewModifier,
                         showETA: () => !unref(upgrade.bought)
                     });
