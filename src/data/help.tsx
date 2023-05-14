@@ -83,7 +83,7 @@ export function getDowsingHelp() {
         jsx(() => (
             <div>
                 <p>
-                    You've created the dowsing rod (🥢)! This machine let's you bias the odds of
+                    You've created the dowsing rod (🥢)! This machine lets you bias the odds of
                     specified resources from mining. It will double the odds of each specified
                     resource, so keep in mind rare resources will still be fairly rare.
                 </p>
@@ -103,7 +103,7 @@ export function getQuarryHelp() {
         jsx(() => (
             <div>
                 <p>
-                    You've created the Quarry (⛰️)! This machine let's you gather specified
+                    You've created the Quarry (⛰️)! This machine lets you gather specified
                     resources. Unlike the mine, this machine will always output the same resources.
                     However, rarer resources will take longer to gather.
                 </p>
@@ -123,7 +123,7 @@ export function getEmpowererHelp() {
         jsx(() => (
             <div>
                 <p>
-                    You've created the Tool Empowerer (🔌)! This machine let's you increase the
+                    You've created the Tool Empowerer (🔌)! This machine lets you increase the
                     effect of specified passives. Experimenting with which passives to empower can
                     really help you progress!
                 </p>
@@ -148,7 +148,7 @@ export function getPortalHelp() {
                 display: jsx(() => (
                     <div>
                         <p>
-                            You've created the Portal Generator (⛩️)! This machine let's you create
+                            You've created the Portal Generator (⛩️)! This machine lets you create
                             portals to other planes, which will have treasures that help you in
                             various ways! To create a portal you need to specify a tier by dragging
                             a resource to the generator - higher tier planes cost more energy to
@@ -341,9 +341,9 @@ export function getBoosterHelp() {
         jsx(() => (
             <div>
                 <p>
-                    You've created the Booster (⌛)! This machine let's you increase the rate of
-                    time of planes! This affects its resource gain, gen treasures, and any other
-                    effects of time.
+                    You've created the Booster (⌛)! This machine lets you increase the rate of time
+                    of planes! This affects its resource gain, gen treasures, and any other effects
+                    of time.
                 </p>
                 <br />
                 <p>
@@ -366,7 +366,7 @@ export function getUpgraderHelp() {
         jsx(() => (
             <div>
                 <p>
-                    You've created the Upgrader (🤖)! This machine let's you automatically purchase
+                    You've created the Upgrader (🤖)! This machine lets you automatically purchase
                     upgrades within planes (includes prestiges but not repeatables or dimensions)!
                 </p>
                 <br />
@@ -386,7 +386,7 @@ export function getAutomatorHelp() {
         jsx(() => (
             <div>
                 <p>
-                    You've created the Automator (🦾)! This machine let's you automatically purchase
+                    You've created the Automator (🦾)! This machine lets you automatically purchase
                     repeatables and dimensions within planes!
                 </p>
                 <br />
@@ -406,9 +406,9 @@ export function getInvestmentsHelp() {
         jsx(() => (
             <div>
                 <p>
-                    You've created the Investments machine (💱)! This machine let's you
-                    automatically gain the resources from conversions without spending the plane's
-                    primary resource!
+                    You've created the Investments machine (💱)! This machine lets you automatically
+                    gain the resources from conversions without spending the plane's primary
+                    resource!
                 </p>
                 <br />
                 <p>
