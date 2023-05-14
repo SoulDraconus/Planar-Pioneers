@@ -495,7 +495,7 @@ export function createPlane(
                     const prevGain = previousGain;
                     costFormula = costFormula.add(
                         computed(() =>
-                            Decimal.sub(n.value, currentN).add(1).times(2).pow10().times(prevGain)
+                            Decimal.sub(n.value, currentN).add(1).pow10().times(prevGain)
                         )
                     );
                     const conversion = createCumulativeConversion(() => ({
@@ -659,7 +659,7 @@ export function createPlane(
                         )
                     );
                     previousGain = costFormula.evaluate();
-                    n.value += 3;
+                    n.value += 2;
                     const barColor = getColor([0.64, 0.75, 0.55], random);
                     const bar = createBar(() => ({
                         direction: Direction.Right,
