@@ -92,3 +92,43 @@ export function getDowsingHelp() {
         ))
     );
 }
+
+export function getQuarryHelp() {
+    return createModal(
+        "Quarry",
+        jsx(() => (
+            <div>
+                <p>
+                    You've created the Quarry (⛏️)! This machine let's you gather specified
+                    resources. Unlike the mine, this machine will always output the same resources.
+                    However, rarer resources will take longer to gather.
+                </p>
+                <br />
+                <p>
+                    Specify resources to gather by dragging them to the quarry. You can only select
+                    a single resource to start, but that can be increased using an action.
+                </p>
+            </div>
+        ))
+    );
+}
+
+export function getEmpowererHelp() {
+    return createModal(
+        "Tool Empowerer",
+        jsx(() => (
+            <div>
+                <p>
+                    You've created the Tool Empowerer (🔌)! This machine let's you increase the
+                    effect of specified passives. Experimenting with which passives to empower can
+                    really help you progress!
+                </p>
+                <br />
+                <p>
+                    Specify passives to empower by dragging them to the empowerer. You can only
+                    select a single passive to start, but that can be increased using an action.
+                </p>
+            </div>
+        ))
+    );
+}

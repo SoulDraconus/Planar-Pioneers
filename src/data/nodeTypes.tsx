@@ -379,7 +379,8 @@ export const quarry = {
     actions: [
         deselectAllAction,
         getIncreaseConnectionsAction(x => x.add(2).pow_base(10000), 16),
-        togglePoweredAction
+        togglePoweredAction,
+        showHelpAction("quarry")
     ],
     progress: node =>
         isPowered(node)
@@ -428,7 +429,8 @@ export const empowerer = {
     actions: [
         deselectAllAction,
         getIncreaseConnectionsAction(x => x.add(3).pow_base(1000), 24),
-        togglePoweredAction
+        togglePoweredAction,
+        showHelpAction("empowerer")
     ],
     canAccept: canAcceptTool,
     onDrop: onDropTool,

@@ -58,6 +58,7 @@ import {
     resourceNames,
     tools
 } from "./data";
+import { getDowsingHelp, getEmpowererHelp, getForgeHelp, getMineHelp, getQuarryHelp } from "./help";
 import "./main.css";
 import {
     automator,
@@ -78,7 +79,6 @@ import {
     upgrader
 } from "./nodeTypes";
 import { GenericPlane, createPlane } from "./planes";
-import { getDowsingHelp, getForgeHelp, getMineHelp } from "./help";
 
 const toast = useToast();
 
@@ -776,7 +776,9 @@ export const main = createLayer("main", function (this: BaseLayer) {
     const helpModals = {
         mine: getMineHelp(),
         factory: getForgeHelp(),
-        dowsing: getDowsingHelp()
+        dowsing: getDowsingHelp(),
+        quarry: getQuarryHelp(),
+        empowerer: getEmpowererHelp()
     };
     helpModals.mine.showModal[DefaultValue] = true;
     helpModals.mine.showModal.value = true;
