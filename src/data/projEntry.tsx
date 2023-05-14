@@ -976,6 +976,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
         resourceLevels,
         planarMultis,
         computedPortalCost,
+        helpModals,
         display: jsx(() => (
             <>
                 <StickyVue class="nav-container">

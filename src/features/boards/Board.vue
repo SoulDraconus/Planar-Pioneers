@@ -254,6 +254,15 @@ function endDragging(node: BoardNode | null, mouseLeave = false) {
 }
 
 function clickAction(node: BoardNode, actionId: string) {
+    const nodeType = props.types.value[node.type];
+    if (
+        getNodeProperty(
+            nodeType.actions?.find(action => action.id === actionId)?.confirmationLabel,
+            node
+        ) == null
+    ) {
+        props.state.value.selectedAction = actionId;
+    }
     if (props.state.value.selectedAction === actionId) {
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         unref(props.selectedAction)!.onClick(unref(props.selectedNode)!);

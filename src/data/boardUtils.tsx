@@ -376,3 +376,18 @@ export function checkConnections<T extends string>(
         }
     }
 }
+
+export function showHelpAction(help: keyof (typeof main)["helpModals"]) {
+    return {
+        id: "help",
+        icon: "question_mark",
+        tooltip: {
+            text: "Help"
+        },
+        onClick() {
+            main.helpModals[help].showModal.value = true;
+            main.board.selectedAction.value = null;
+        },
+        confirmationLabel: null
+    };
+}

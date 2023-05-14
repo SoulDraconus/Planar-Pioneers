@@ -26,6 +26,7 @@ import {
     onDropPortal,
     onDropResource,
     onDropTool,
+    showHelpAction,
     togglePoweredAction
 } from "./boardUtils";
 import {
@@ -64,7 +65,7 @@ export const mine = {
             ? { text: "Click me!" }
             : null,
     actionDistance: Math.PI / 4,
-    actions: [togglePoweredAction],
+    actions: [togglePoweredAction, showHelpAction("mine")],
     progress: node =>
         isPowered(node) ? new Decimal((node.state as unknown as MineState).progress).toNumber() : 0,
     progressDisplay: ProgressDisplay.Outline,
