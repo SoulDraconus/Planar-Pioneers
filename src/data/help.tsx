@@ -5,6 +5,8 @@ import { createTabFamily } from "features/tabs/tabFamily";
 import { Persistent, persistent } from "game/persistence";
 import { renderJSX } from "util/vue";
 import { main } from "./projEntry";
+import ToggleVue from "components/fields/Toggle.vue";
+import settings from "game/settings";
 
 export interface ModalData {
     modal: JSXFunction;
@@ -163,6 +165,22 @@ export function getPortalHelp() {
                             active will no longer work. This can be used to keep your workspace
                             clean from old portals you no longer need or want.
                         </p>
+                        <br />
+                        <p>
+                            Once you have portals, the lines on the board might getting particularly
+                            necessary. Here's a setting (also accessible in the settings modal) to
+                            disable resource gain lines unless the node is active.
+                        </p>
+                        <br />
+                        <ToggleVue
+                            title={jsx(() => (
+                                <span class="option-title">
+                                    Always show lines to resource nodes
+                                </span>
+                            ))}
+                            modelValue={settings.lineVisibility}
+                            onUpdate:modelValue={value => (settings.lineVisibility = value)}
+                        />
                     </div>
                 ))
             }))

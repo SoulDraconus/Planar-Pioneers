@@ -15,6 +15,7 @@ import {
 import { main } from "./projEntry";
 import { DecimalSource } from "lib/break_eternity";
 import { ComputedRef } from "vue";
+import settings from "game/settings";
 
 export const resourceLevelFormula = Formula.variable(0)
     .step(2000, x => x.pow_base(1.02))
@@ -390,4 +391,12 @@ export function showHelpAction(help: keyof (typeof main)["helpModals"]) {
         },
         confirmationLabel: null
     };
+}
+
+export function resourceLinesFilter(node: BoardNode) {
+    return (resource: Resources) =>
+        settings.lineVisibility ||
+        node === main.board.selectedNode.value ||
+        node === main.board.draggingNode.value ||
+        main.resourceNodes.value[resource] === main.board.draggingNode.value;
 }

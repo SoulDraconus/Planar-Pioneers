@@ -75,7 +75,7 @@ const toast = useToast();
 
 export type Treasure = GenericAchievement & {
     update?: (diff: DecimalSource) => void;
-    link?: ComputedRef<BoardNode>;
+    link?: Resources;
     effectedResource?: Resources | "energy";
     resourceMulti: DecimalSource;
 };
@@ -973,7 +973,7 @@ export function createPlane(
             let description = "";
             let update: (diff: DecimalSource) => void;
             let onComplete: VoidFunction;
-            let link: ComputedRef<BoardNode>;
+            let link: Resources;
             let randomResource: Resources;
             let effectedResource: Resources | "energy";
             let resourceMulti: DecimalSource;
@@ -1004,7 +1004,7 @@ export function createPlane(
                         gain
                     )} ${randomResource}/s while plane is active.`;
                     update = diff => main.grantResource(randomResource, Decimal.times(diff, gain));
-                    link = computed(() => main.resourceNodes.value[randomResource]);
+                    link = randomResource;
                     break;
                 case "resourceMulti":
                     effectedResource = randomResource = getRandomResource(random, influences);
@@ -1300,7 +1300,7 @@ export function createPlane(
         );
 
         const links = computed(() => {
-            const links: ComputedRef<BoardNode>[] = [];
+            const links: Resources[] = [];
             earnedTreasures.value.forEach(treasure => {
                 if (treasure.link) {
                     links.push(treasure.link);

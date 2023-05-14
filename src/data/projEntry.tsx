@@ -7,7 +7,7 @@ import {
     createBoard,
     getUniqueNodeID
 } from "features/boards/board";
-import { jsx } from "features/feature";
+import { jsx, setDefault } from "features/feature";
 import { createResource } from "features/resources/resource";
 import { createTabFamily } from "features/tabs/tabFamily";
 import Formula from "game/formulas/formulas";
@@ -22,7 +22,7 @@ import {
 import { DefaultValue, State } from "game/persistence";
 import type { LayerData, Player } from "game/player";
 import player from "game/player";
-import settings from "game/settings";
+import settings, { registerSettingField } from "game/settings";
 import Decimal, { DecimalSource, format, formatSmall, formatWhole } from "util/bignum";
 import { WithRequired, camelToTitle } from "util/common";
 import { render } from "util/vue";
@@ -33,6 +33,7 @@ import {
     isEmpowered,
     isPowered,
     resourceLevelFormula,
+    resourceLinesFilter,
     togglePoweredAction
 } from "./boardUtils";
 import { Section, createCollapsibleModifierSections, createFormulaPreview } from "./common";
@@ -90,6 +91,8 @@ import {
     upgrader
 } from "./nodeTypes";
 import { GenericPlane, createPlane } from "./planes";
+import { globalBus } from "game/events";
+import ToggleVue from "components/fields/Toggle.vue";
 
 const toast = useToast();
 
@@ -262,12 +265,14 @@ export const main = createLayer("main", function (this: BaseLayer) {
         links() {
             const links: BoardNodeLink[] = [];
             links.push(
-                ...Object.keys(resourceMinedCooldown).map(resource => ({
-                    startNode: mine.value,
-                    endNode: resourceNodes.value[resource as Resources],
-                    stroke: "var(--accent3)",
-                    strokeWidth: 5
-                }))
+                ...(Object.keys(resourceMinedCooldown) as Resources[])
+                    .filter(resourceLinesFilter(mine.value))
+                    .map(resource => ({
+                        startNode: mine.value,
+                        endNode: resourceNodes.value[resource as Resources],
+                        stroke: "var(--accent3)",
+                        strokeWidth: 5
+                    }))
             );
             if (factory.value != null && factory.value.state != null) {
                 links.push({
@@ -295,21 +300,14 @@ export const main = createLayer("main", function (this: BaseLayer) {
                         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                         startNode: quarry.value!,
                         endNode: resourceNodes.value[resource],
-                        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                        stroke: "var(--foreground)",
+                        stroke:
+                            resource in resourceQuarriedCooldown
+                                ? "var(--accent3)"
+                                : "var(--foreground)",
                         strokeWidth: 4
                     });
                 });
             }
-            links.push(
-                ...Object.keys(resourceQuarriedCooldown).map(resource => ({
-                    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                    startNode: quarry.value!,
-                    endNode: resourceNodes.value[resource as Resources],
-                    stroke: "var(--accent3)",
-                    strokeWidth: 5
-                }))
-            );
             if (empowerer.value != null) {
                 (empowerer.value.state as unknown as EmpowererState).tools.forEach(tool => {
                     links.push({
@@ -345,30 +343,22 @@ export const main = createLayer("main", function (this: BaseLayer) {
                 });
                 (board as GenericBoard).types.portal.nodes.value.forEach(node => {
                     const plane = layers[(node.state as unknown as PortalState).id] as GenericPlane;
-                    plane.links.value.forEach(n => {
-                        if (n.value != null) {
-                            links.push({
-                                startNode: node,
-                                endNode: n.value,
-                                stroke: isPowered(node) ? "var(--accent3)" : "var(--foreground)",
-                                strokeWidth: 4
-                            });
+                    resourceNames.filter(resourceLinesFilter(node)).forEach(resource => {
+                        let color;
+                        if (plane.links.value.includes(resource)) {
+                            color = "var(--accent3)";
+                        } else if (resource in plane.resourceMultis.value) {
+                            color = "var(--accent1)";
+                        } else {
+                            return;
                         }
+                        links.push({
+                            startNode: node,
+                            endNode: resourceNodes.value[resource],
+                            stroke: isPowered(node) ? color : "var(--foreground)",
+                            strokeWidth: 4
+                        });
                     });
-                    (Object.keys(plane.resourceMultis.value) as (Resources | "energy")[]).forEach(
-                        type => {
-                            if (type !== "energy" && type in resourceNodes.value) {
-                                links.push({
-                                    startNode: node,
-                                    endNode: resourceNodes.value[type],
-                                    stroke: isPowered(node)
-                                        ? "var(--accent1)"
-                                        : "var(--foreground)",
-                                    strokeWidth: 4
-                                });
-                            }
-                        }
-                    );
                     return links;
                 });
             }
@@ -1044,6 +1034,33 @@ export const main = createLayer("main", function (this: BaseLayer) {
         ))
     };
 });
+
+declare module "game/settings" {
+    interface Settings {
+        lineVisibility: boolean;
+    }
+}
+
+globalBus.on("loadSettings", settings => {
+    setDefault(settings, "lineVisibility", true);
+});
+
+registerSettingField(
+    jsx(() => (
+        <ToggleVue
+            title={jsx(() => (
+                <span class="option-title">
+                    Always show lines to resource nodes
+                    <desc>
+                        Otherwise, will only be visible when either end of the line is selected.
+                    </desc>
+                </span>
+            ))}
+            modelValue={settings.lineVisibility}
+            onUpdate:modelValue={value => (settings.lineVisibility = value)}
+        />
+    ))
+);
 
 /**
  * Given a player save data object being loaded, return a list of layers that should currently be enabled.
