@@ -455,6 +455,11 @@ export const portalGenerator = {
                 text: "Add influence",
                 color: "var(--accent2)"
             };
+        } else if (draggingNode?.type === "portal") {
+            const portal = layers[
+                (draggingNode.state as unknown as PortalState).id
+            ] as GenericPlane;
+            return { text: `Copy tier/influences from ${portal.name}` };
         }
         return null;
     },
@@ -534,7 +539,11 @@ export const portalGenerator = {
         }
     ],
     canAccept(node, otherNode) {
-        return otherNode.type === "resource" || otherNode.type === "influence";
+        return (
+            otherNode.type === "resource" ||
+            otherNode.type === "influence" ||
+            otherNode.type === "portal"
+        );
     },
     onDrop(node, otherNode) {
         if (otherNode.type === "resource") {
@@ -558,6 +567,15 @@ export const portalGenerator = {
                     influences: [...currentInfluences, droppedInfluence]
                 };
             }
+        } else if (otherNode.type === "portal") {
+            const portal = layers[(otherNode.state as unknown as PortalState).id] as GenericPlane;
+            node.state = {
+                ...(node.state as object),
+                tier: portal.tier.value,
+                influences: (portal.influences.value as unknown as InfluenceState[]).map(
+                    influence => influence.type
+                )
+            };
         }
         main.board.selectedNode.value = node;
     },
