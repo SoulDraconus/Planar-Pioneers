@@ -978,6 +978,8 @@ export const trashCan = {
                 )
             };
         }
+        // Manually set player.tabs because the watcher won't take place until next render
+        player.tabs = player.tabs.filter(s => s !== portal);
     },
     draggable: true
 } as NodeTypeOptions;
