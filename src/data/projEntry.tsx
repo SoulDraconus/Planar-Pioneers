@@ -731,7 +731,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
             miningTabCollapsed
         }),
         resources: () => ({
-            display: "Mine Rates",
+            display: "Ore Rates",
             glowColor(): string {
                 return modifierTabs.activeTab.value === this.tab ? "white" : "";
             },
@@ -740,7 +740,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
             resourcesCollapsed
         }),
         resourcesGain: () => ({
-            display: "Resource Gain",
+            display: "Ore Gain",
             glowColor(): string {
                 return modifierTabs.activeTab.value === this.tab ? "white" : "";
             },

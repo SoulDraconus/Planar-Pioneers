@@ -98,6 +98,14 @@ export function getIncreaseConnectionsAction(
                 )} energy`
             };
         },
+        fillColor(node: BoardNode) {
+            return Decimal.gte(
+                main.energy.value,
+                formula.evaluate((node.state as { maxConnections: number }).maxConnections)
+            )
+                ? "var(--bought)"
+                : "var(--locked)";
+        },
         confirmationLabel: (node: BoardNode): NodeLabel =>
             Decimal.gte(
                 main.energy.value,

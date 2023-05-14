@@ -743,6 +743,14 @@ export const booster = {
                     )} energy`
                 };
             },
+            fillColor(node: BoardNode) {
+                return Decimal.gte(
+                    main.energy.value,
+                    increaseBoostFormula.evaluate((node.state as unknown as BoosterState).level)
+                )
+                    ? "var(--bought)"
+                    : "var(--locked)";
+            },
             confirmationLabel(node: BoardNode) {
                 return Decimal.gte(
                     main.energy.value,
