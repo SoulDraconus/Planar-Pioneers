@@ -334,3 +334,89 @@ export function getPortalHelp() {
         { tabFamily }
     );
 }
+
+export function getBoosterHelp() {
+    return createModal(
+        "Booster",
+        jsx(() => (
+            <div>
+                <p>
+                    You've created the Booster (⌛)! This machine let's you increase the rate of
+                    time of planes! This affects its resource gain, gen treasures, and any other
+                    effects of time.
+                </p>
+                <br />
+                <p>
+                    Specify planes to boost by dragging their portals to the booster. You can only
+                    select a single plane to start, but that can be increased using an action.
+                </p>
+                <br />
+                <p>
+                    Initially the booster will double the rate of time, but that can be increased
+                    using an action.
+                </p>
+            </div>
+        ))
+    );
+}
+
+export function getUpgraderHelp() {
+    return createModal(
+        "Upgrader",
+        jsx(() => (
+            <div>
+                <p>
+                    You've created the Upgrader (🤖)! This machine let's you automatically purchase
+                    upgrades within planes (includes prestiges but not repeatables or dimensions)!
+                </p>
+                <br />
+                <p>
+                    Specify planes to auto-purchase upgrades from by dragging their portals to the
+                    booster. You can only select a single plane to start, but that can be increased
+                    using an action.
+                </p>
+            </div>
+        ))
+    );
+}
+
+export function getAutomatorHelp() {
+    return createModal(
+        "Automator",
+        jsx(() => (
+            <div>
+                <p>
+                    You've created the Automator (🦾)! This machine let's you automatically purchase
+                    repeatables and dimensions within planes!
+                </p>
+                <br />
+                <p>
+                    Specify planes to auto-purchase repeatables and dimensions from by dragging
+                    their portals to the booster. You can only select a single plane to start, but
+                    that can be increased using an action.
+                </p>
+            </div>
+        ))
+    );
+}
+
+export function getInvestmentsHelp() {
+    return createModal(
+        "Investments",
+        jsx(() => (
+            <div>
+                <p>
+                    You've created the Investments machine (💱)! This machine let's you
+                    automatically gain the resources from conversions without spending the plane's
+                    primary resource!
+                </p>
+                <br />
+                <p>
+                    Specify planes to gain converted resources from by dragging their portals to the
+                    booster. You can only select a single plane to start, but that can be increased
+                    using an action.
+                </p>
+            </div>
+        ))
+    );
+}

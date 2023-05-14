@@ -798,7 +798,8 @@ export const booster = {
                 }
             }
         },
-        togglePoweredAction
+        togglePoweredAction,
+        showHelpAction("booster")
     ],
     canAccept: canAcceptPortal,
     onDrop: onDropPortal,
@@ -834,7 +835,8 @@ export const upgrader = {
     actions: [
         deselectAllAction,
         getIncreaseConnectionsAction(x => x.add(4).pow_base(1e6)),
-        togglePoweredAction
+        togglePoweredAction,
+        showHelpAction("upgrader")
     ],
     canAccept: canAcceptPortal,
     onDrop: onDropPortal,
@@ -870,7 +872,8 @@ export const automator = {
     actions: [
         deselectAllAction,
         getIncreaseConnectionsAction(x => x.add(4).pow_base(1e6)),
-        togglePoweredAction
+        togglePoweredAction,
+        showHelpAction("automator")
     ],
     canAccept: canAcceptPortal,
     onDrop: onDropPortal,
@@ -906,7 +909,8 @@ export const investments = {
     actions: [
         deselectAllAction,
         getIncreaseConnectionsAction(x => x.add(3).pow_base(1e8)),
-        togglePoweredAction
+        togglePoweredAction,
+        showHelpAction("investments")
     ],
     canAccept: canAcceptPortal,
     onDrop: onDropPortal,

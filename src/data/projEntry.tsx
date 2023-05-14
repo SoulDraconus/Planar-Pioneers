@@ -59,12 +59,16 @@ import {
     tools
 } from "./data";
 import {
+    getAutomatorHelp,
+    getBoosterHelp,
     getDowsingHelp,
     getEmpowererHelp,
     getForgeHelp,
+    getInvestmentsHelp,
     getMineHelp,
     getPortalHelp,
-    getQuarryHelp
+    getQuarryHelp,
+    getUpgraderHelp
 } from "./help";
 import "./main.css";
 import {
@@ -786,7 +790,11 @@ export const main = createLayer("main", function (this: BaseLayer) {
         dowsing: getDowsingHelp(),
         quarry: getQuarryHelp(),
         empowerer: getEmpowererHelp(),
-        portalGenerator: getPortalHelp()
+        portalGenerator: getPortalHelp(),
+        booster: getBoosterHelp(),
+        upgrader: getUpgraderHelp(),
+        automator: getAutomatorHelp(),
+        investments: getInvestmentsHelp()
     };
     helpModals.mine.showModal[DefaultValue] = true;
     helpModals.mine.showModal.value = true;
