@@ -96,7 +96,7 @@ export const brokenFactory = {
                 }
             },
             confirmationLabel: () =>
-                Decimal.gte(main.energy.value, 1000)
+                Decimal.gte(main.energy.value, 100)
                     ? { text: "Tap again to confirm" }
                     : { text: "Cannot afford", color: "var(--danger)" }
         }
