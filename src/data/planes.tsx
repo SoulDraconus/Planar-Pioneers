@@ -959,17 +959,11 @@ export function createPlane(
                 }
             }
             const treasureWeights = {
-                cache: "increaseCaches" in influenceState ? 10 : 1,
+                cache: "increaseCaches" in influenceState ? 8 : 0.8,
                 generation: "increaseGens" in influenceState ? 10 : 1,
                 resourceMulti: "increaseResourceMults" in influenceState ? 10 : 1,
                 energyMulti: "increaseEnergyMults" in influenceState ? 2.5 : 0.25,
-                influences:
-                    Object.keys(main.influenceNodes.value).length + influenceTreasures.length ===
-                    Object.keys(influenceTypes).length
-                        ? 0
-                        : "increaseInfluences" in influenceState
-                        ? 20
-                        : 2,
+                influences: "increaseInfluences" in influenceState ? 20 : 2,
                 relic: 0
             };
             let treasureType = pickRandom(treasureWeights, random);
@@ -1003,9 +997,9 @@ export function createPlane(
                     break;
                 case "generation":
                     randomResource = getRandomResource(random, influences);
-                    const gain = Decimal.div(rewardsLevel.value, 40).times(
-                        mineLootTable[randomResource]
-                    );
+                    const gain = Decimal.pow(rewardsLevel.value, 2)
+                        .div(40)
+                        .times(mineLootTable[randomResource]);
                     description = `Gen: Gain ${format(
                         gain
                     )} ${randomResource}/s while plane is active.`;
@@ -1014,7 +1008,7 @@ export function createPlane(
                     break;
                 case "resourceMulti":
                     effectedResource = randomResource = getRandomResource(random, influences);
-                    resourceMulti = Decimal.div(rewardsLevel.value, 10).pow_base(2);
+                    resourceMulti = Decimal.pow(rewardsLevel.value, 2).div(10).pow_base(1.5);
                     description = `Resource Mult: Gain ${format(
                         resourceMulti
                     )}x ${randomResource} while plane is active.`;
