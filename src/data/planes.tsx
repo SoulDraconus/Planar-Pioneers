@@ -1027,7 +1027,7 @@ export function createPlane(
                         Math.floor(random() * Object.keys(influenceTypes).length)
                     ];
                     influenceTreasures.push(randomInfluence);
-                    description = `Gain a new portal influence (${influenceTypes[randomInfluence].display})`;
+                    description = `Gain a portal influence (${influenceTypes[randomInfluence].display})`;
                     onComplete = () => {
                         if (randomInfluence in main.influenceNodes.value) {
                             toast.warning(

@@ -153,7 +153,7 @@ export const tools = {
     },
     emerald: {
         cost: 1e19,
-        name: "Artificial Intelligence",
+        name: "AI",
         type: "passive",
         state: "emerald"
     },
@@ -165,7 +165,7 @@ export const tools = {
     },
     diamond: {
         cost: 1e30,
-        name: "Machine Learning",
+        name: "ML",
         type: "passive",
         state: "diamond"
     },
@@ -200,7 +200,7 @@ export const tools = {
 export const relics = {
     dirt: "BOGO Coupon",
     sand: "Metal Detector",
-    gravel: "Neural Networks",
+    gravel: "Neural Nets",
     wood: "Mining Laser",
     stone: "Replicator",
     coal: "Planar Intelligence",
@@ -212,7 +212,7 @@ export const relics = {
     platinum: "Time Dilation",
     diamond: "Paypal",
     berylium: "Tiered Mining",
-    unobtainium: "Overclocked Portals",
+    unobtainium: "OC'ed Portals",
     ultimatum: "Rebates"
 } as const satisfies Record<Resources, string>;
 
