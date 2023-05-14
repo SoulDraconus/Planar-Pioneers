@@ -4,6 +4,7 @@ import { createTab } from "features/tabs/tab";
 import { createTabFamily } from "features/tabs/tabFamily";
 import { Persistent, persistent } from "game/persistence";
 import { renderJSX } from "util/vue";
+import { main } from "./projEntry";
 
 export interface ModalData {
     modal: JSXFunction;
@@ -217,66 +218,104 @@ export function getPortalHelp() {
                             influence will multiply the energy cost of creating the portal.
                         </p>
                         <br />
-                        Influences:
-                        <ul style="list-style-type: unset">
-                            <li style="margin-top: var(--feature-margin)">
-                                <b style="color: var(--bought)">+resource</b>: Can be connected to
-                                resources and will cause any treasures that reference resources
-                                (caches, gens, and resource mults) to have increased odds of picking
-                                a selected resource.
-                            </li>
-                            <li style="margin-top: var(--feature-margin)">
-                                <b style="color: var(--bought)">-resource</b>: Can be connected to
-                                resources and will cause any treasures that reference resources
-                                (caches, gens, and resource mults) to have decreased odds of picking
-                                a selected resource.
-                            </li>
-                            <li style="margin-top: var(--feature-margin)">
-                                <b style="color: var(--bought)">+length</b>: Cause the plane to have
-                                1 extra treasure than it otherwise would have.
-                            </li>
-                            <li style="margin-top: var(--feature-margin)">
-                                <b style="color: var(--bought)">+caches</b>: Causes treasures to
-                                have an increased chance to be caches.
-                            </li>
-                            <li style="margin-top: var(--feature-margin)">
-                                <b style="color: var(--bought)">+gens</b>: Causes treasures to have
-                                an increased chance to be gens.
-                            </li>
-                            <li style="margin-top: var(--feature-margin)">
-                                <b style="color: var(--bought)">+resource mults</b>: Causes
-                                treasures to have an increased chance to be resource mults.
-                            </li>
-                            <li style="margin-top: var(--feature-margin)">
-                                <b style="color: var(--bought)">+energy mults</b>: Causes treasures
-                                to have an increased chance to be energy mults.
-                            </li>
-                            <li style="margin-top: var(--feature-margin)">
-                                <b style="color: var(--bought)">+influences</b>: Causes treasures to
-                                have an increased chance to be influences.
-                            </li>
-                            <li style="margin-top: var(--feature-margin)">
-                                <b style="color: var(--bought)">+relic</b>: Maximizes length and
-                                difficulty for this tier of plane, and makes the last treasure a
-                                relic (unique per tier of plane). Overrides any other
-                                difficulty-changing influences.
-                            </li>
-                            <li style="margin-top: var(--feature-margin)">
-                                <b style="color: var(--bought)">+difficulty</b>: Causes the
-                                difficulty and rewards to be in the upper half of what's possible at
-                                this tier.
-                            </li>
-                            <li style="margin-top: var(--feature-margin)">
-                                <b style="color: var(--bought)">-difficulty</b>: Causes the
-                                difficulty and rewards to be in the lower half of what's possible at
-                                this tier.
-                            </li>
-                            <li style="margin-top: var(--feature-margin)">
-                                <b style="color: var(--bought)">+rewards</b>: Causes the quality of
-                                treasures to be 1 tier higher. Does not affect influences or relics
-                                treasures.
-                            </li>
-                        </ul>
+                        {Object.keys(main.influenceNodes.value).length > 0 ? (
+                            <div>
+                                Discovered influences:
+                                <ul style="list-style-type: unset">
+                                    {main.influenceNodes.value.increaseResources == null ? null : (
+                                        <li style="margin-top: var(--feature-margin)">
+                                            <b style="color: var(--bought)">+resource</b>: Can be
+                                            connected to resources and will cause any treasures that
+                                            reference resources (caches, gens, and resource mults)
+                                            to have increased odds of picking a selected resource.
+                                        </li>
+                                    )}
+                                    {main.influenceNodes.value.decreaseResources == null ? null : (
+                                        <li style="margin-top: var(--feature-margin)">
+                                            <b style="color: var(--bought)">-resource</b>: Can be
+                                            connected to resources and will cause any treasures that
+                                            reference resources (caches, gens, and resource mults)
+                                            to have decreased odds of picking a selected resource.
+                                        </li>
+                                    )}
+                                    {main.influenceNodes.value.increaseLength == null ? null : (
+                                        <li style="margin-top: var(--feature-margin)">
+                                            <b style="color: var(--bought)">+length</b>: Cause the
+                                            plane to have 1 extra treasure than it otherwise would
+                                            have.
+                                        </li>
+                                    )}
+                                    {main.influenceNodes.value.increaseCaches == null ? null : (
+                                        <li style="margin-top: var(--feature-margin)">
+                                            <b style="color: var(--bought)">+caches</b>: Causes
+                                            treasures to have an increased chance to be caches.
+                                        </li>
+                                    )}
+                                    {main.influenceNodes.value.increaseGens == null ? null : (
+                                        <li style="margin-top: var(--feature-margin)">
+                                            <b style="color: var(--bought)">+gens</b>: Causes
+                                            treasures to have an increased chance to be gens.
+                                        </li>
+                                    )}
+                                    {main.influenceNodes.value.increaseResourceMults ==
+                                    null ? null : (
+                                        <li style="margin-top: var(--feature-margin)">
+                                            <b style="color: var(--bought)">+resource mults</b>:
+                                            Causes treasures to have an increased chance to be
+                                            resource mults.
+                                        </li>
+                                    )}
+                                    {main.influenceNodes.value.increaseEnergyMults ==
+                                    null ? null : (
+                                        <li style="margin-top: var(--feature-margin)">
+                                            <b style="color: var(--bought)">+energy mults</b>:
+                                            Causes treasures to have an increased chance to be
+                                            energy mults.
+                                        </li>
+                                    )}
+                                    {main.influenceNodes.value.increaseInfluences == null ? null : (
+                                        <li style="margin-top: var(--feature-margin)">
+                                            <b style="color: var(--bought)">+influences</b>: Causes
+                                            treasures to have an increased chance to be influences.
+                                        </li>
+                                    )}
+                                    {main.influenceNodes.value.relic == null ? null : (
+                                        <li style="margin-top: var(--feature-margin)">
+                                            <b style="color: var(--bought)">+relic</b>: Maximizes
+                                            length and difficulty for this tier of plane, and makes
+                                            the last treasure a relic (unique per tier of plane).
+                                            Overrides any other difficulty-changing influences.
+                                        </li>
+                                    )}
+                                    {main.influenceNodes.value.increaseDiff == null ? null : (
+                                        <li style="margin-top: var(--feature-margin)">
+                                            <b style="color: var(--bought)">+difficulty</b>: Causes
+                                            the difficulty and rewards to be in the upper half of
+                                            what's possible at this tier.
+                                        </li>
+                                    )}
+                                    {main.influenceNodes.value.decreaseDiff == null ? null : (
+                                        <li style="margin-top: var(--feature-margin)">
+                                            <b style="color: var(--bought)">-difficulty</b>: Causes
+                                            the difficulty and rewards to be in the lower half of
+                                            what's possible at this tier.
+                                        </li>
+                                    )}
+                                    {main.influenceNodes.value.increaseRewards == null ? null : (
+                                        <li style="margin-top: var(--feature-margin)">
+                                            <b style="color: var(--bought)">+rewards</b>: Causes the
+                                            quality of treasures to be 1 tier higher. Does not
+                                            affect influences or relics treasures.
+                                        </li>
+                                    )}
+                                </ul>
+                            </div>
+                        ) : (
+                            <div>
+                                Once you discover influences, summaries will appear here describing
+                                their effects.
+                            </div>
+                        )}
                     </div>
                 ))
             }))
