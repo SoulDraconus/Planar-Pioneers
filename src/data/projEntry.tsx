@@ -361,52 +361,62 @@ export const main = createLayer("main", function (this: BaseLayer) {
                 });
             }
             if (booster.value != null) {
-                (booster.value.state as unknown as BoosterState).portals.forEach(portal => {
-                    links.push({
-                        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                        startNode: booster.value!,
-                        endNode: portalNodes.value[portal],
-                        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                        stroke: isPowered(booster.value!) ? "var(--accent1)" : "var(--foreground)",
-                        strokeWidth: 4
+                (booster.value.state as unknown as BoosterState).portals
+                    .filter(p => portalNodes.value[p] != null)
+                    .forEach(portal => {
+                        links.push({
+                            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                            startNode: booster.value!,
+                            endNode: portalNodes.value[portal],
+                            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                            stroke: isPowered(booster.value!)
+                                ? "var(--accent1)"
+                                : "var(--foreground)",
+                            strokeWidth: 4
+                        });
                     });
-                });
             }
             if (upgrader.value != null) {
-                (upgrader.value.state as unknown as UpgraderState).portals.forEach(portal => {
-                    links.push({
-                        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                        startNode: upgrader.value!,
-                        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                        endNode: portalNodes.value[portal],
-                        stroke: "var(--foreground)",
-                        strokeWidth: 4
+                (upgrader.value.state as unknown as UpgraderState).portals
+                    .filter(p => portalNodes.value[p] != null)
+                    .forEach(portal => {
+                        links.push({
+                            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                            startNode: upgrader.value!,
+                            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                            endNode: portalNodes.value[portal],
+                            stroke: "var(--foreground)",
+                            strokeWidth: 4
+                        });
                     });
-                });
             }
             if (automator.value != null) {
-                (automator.value.state as unknown as AutomatorState).portals.forEach(portal => {
-                    links.push({
-                        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                        startNode: automator.value!,
-                        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                        endNode: portalNodes.value[portal],
-                        stroke: "var(--foreground)",
-                        strokeWidth: 4
+                (automator.value.state as unknown as AutomatorState).portals
+                    .filter(p => portalNodes.value[p] != null)
+                    .forEach(portal => {
+                        links.push({
+                            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                            startNode: automator.value!,
+                            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                            endNode: portalNodes.value[portal],
+                            stroke: "var(--foreground)",
+                            strokeWidth: 4
+                        });
                     });
-                });
             }
             if (investments.value != null) {
-                (investments.value.state as unknown as InvestmentsState).portals.forEach(portal => {
-                    links.push({
-                        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                        startNode: investments.value!,
-                        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                        endNode: portalNodes.value[portal],
-                        stroke: "var(--foreground)",
-                        strokeWidth: 4
+                (investments.value.state as unknown as InvestmentsState).portals
+                    .filter(p => portalNodes.value[p] != null)
+                    .forEach(portal => {
+                        links.push({
+                            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                            startNode: investments.value!,
+                            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                            endNode: portalNodes.value[portal],
+                            stroke: "var(--foreground)",
+                            strokeWidth: 4
+                        });
                     });
-                });
             }
             Object.values(influenceNodes.value).forEach(node => {
                 const state = node.state as unknown as InfluenceState;
