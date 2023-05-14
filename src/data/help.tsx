@@ -46,3 +46,24 @@ export function getMineHelp() {
         ))
     );
 }
+
+export function getForgeHelp() {
+    return createModal(
+        "Forging",
+        jsx(() => (
+            <div>
+                <p>
+                    You've repaired the forge (🛠️)! This is the next main line of progression. Here
+                    you'll be able to craft a total of 16 machines and passive bonuses to create -
+                    one for each resource!
+                </p>
+                <br />
+                <p>
+                    Drag a resource onto the forge to select that resource tier. You can then use an
+                    action on the forge to create that item, at the cost of energy based on the
+                    resource tier. You can only have 1 of each item.
+                </p>
+            </div>
+        ))
+    );
+}

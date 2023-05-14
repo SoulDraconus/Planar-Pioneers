@@ -78,7 +78,7 @@ import {
     upgrader
 } from "./nodeTypes";
 import { GenericPlane, createPlane } from "./planes";
-import { getMineHelp } from "./help";
+import { getForgeHelp, getMineHelp } from "./help";
 
 const toast = useToast();
 
@@ -774,7 +774,8 @@ export const main = createLayer("main", function (this: BaseLayer) {
     ));
 
     const helpModals = {
-        mine: getMineHelp()
+        mine: getMineHelp(),
+        factory: getForgeHelp()
     };
     helpModals.mine.showModal[DefaultValue] = true;
     helpModals.mine.showModal.value = true;

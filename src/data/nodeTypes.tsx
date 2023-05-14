@@ -91,6 +91,7 @@ export const brokenFactory = {
                 if (Decimal.gte(main.energy.value, 100)) {
                     node.type = "factory";
                     main.energy.value = Decimal.sub(main.energy.value, 100);
+                    main.helpModals.factory.showModal.value = true;
                 }
             },
             confirmationLabel: () =>
@@ -198,7 +199,8 @@ export const factory = {
                         ? { text: "Tap again to confirm" }
                         : { text: "Already crafted", color: "var(--danger)" }
                     : { text: "Cannot afford", color: "var(--danger)" }
-        }
+        },
+        showHelpAction("factory")
     ],
     progress: node =>
         node.state == null || main.toolNodes.value[node.state as Resources] != null
