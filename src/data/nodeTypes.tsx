@@ -874,7 +874,7 @@ export const investments = {
             };
         }
         return labelForAcceptingPortal(node, portal => {
-            return `Auto-buy ${(layers[portal] as GenericPlane).name}'s repeatables and dimensions`;
+            return `Passively generate ${(layers[portal] as GenericPlane).name}'s conversions`;
         });
     },
     actionDistance: Math.PI / 4,
@@ -921,6 +921,38 @@ export const trashCan = {
         main.board.state.value.nodes = main.board.state.value.nodes.filter(
             node => node !== otherNode
         );
+        if (main.booster.value) {
+            main.booster.value.state = {
+                ...(main.booster.value.state as object),
+                portals: (main.booster.value.state as unknown as BoosterState).portals.filter(
+                    p => p !== portal
+                )
+            };
+        }
+        if (main.upgrader.value) {
+            main.upgrader.value.state = {
+                ...(main.upgrader.value.state as object),
+                portals: (main.upgrader.value.state as unknown as BoosterState).portals.filter(
+                    p => p !== portal
+                )
+            };
+        }
+        if (main.automator.value) {
+            main.automator.value.state = {
+                ...(main.automator.value.state as object),
+                portals: (main.automator.value.state as unknown as BoosterState).portals.filter(
+                    p => p !== portal
+                )
+            };
+        }
+        if (main.investments.value) {
+            main.investments.value.state = {
+                ...(main.investments.value.state as object),
+                portals: (main.investments.value.state as unknown as BoosterState).portals.filter(
+                    p => p !== portal
+                )
+            };
+        }
     },
     draggable: true
 } as NodeTypeOptions;

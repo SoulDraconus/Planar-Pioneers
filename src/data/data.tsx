@@ -399,13 +399,13 @@ export const influences = {
         initialData: undefined
     },
     increaseDiff: {
-        display: "+diff",
+        display: "+difficulty",
         description: "Increase difficulty/rewards odds",
         cost: 10,
         initialData: undefined
     },
     decreaseDiff: {
-        display: "-diff",
+        display: "-difficulty",
         description: "Decrease difficulty/rewards odds",
         cost: 10,
         initialData: undefined
