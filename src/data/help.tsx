@@ -156,6 +156,13 @@ export function getPortalHelp() {
                             time in planes will be paused if the portal is inactive (not selected
                             nor powered).
                         </p>
+                        <br />
+                        <p>
+                            You've also gained a trash can for portals (🗑️). Dragging a portal here
+                            will permanently destroy it. Any treasures that require the portal to be
+                            active will no longer work. This can be used to keep your workspace
+                            clean from old portals you no longer need or want.
+                        </p>
                     </div>
                 ))
             }))
