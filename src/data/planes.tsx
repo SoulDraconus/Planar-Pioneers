@@ -1031,7 +1031,7 @@ export function createPlane(
                     onComplete = () => {
                         if (randomInfluence in main.influenceNodes.value) {
                             toast.warning(
-                                `Error: ignoring duplicate portal influence (${influenceTypes[randomInfluence].display})`
+                                `You already have a ${influenceTypes[randomInfluence].display} influence, skipping treasure`
                             );
                             return;
                         }
@@ -1078,7 +1078,9 @@ export function createPlane(
                             main.board.placeInAvailableSpace(node);
                             main.board.nodes.value.push(node);
                         } else {
-                            toast.warning(`Error: ignoring duplicate relic (${relics[tier]})`);
+                            toast.warning(
+                                `You already have a ${relics[tier]} relic, skipping treasure`
+                            );
                         }
                     };
             }
