@@ -74,6 +74,7 @@ import {
     portalGenerator,
     quarry,
     resource,
+    trashCan,
     upgrader
 } from "./nodeTypes";
 import { GenericPlane, createPlane } from "./planes";
@@ -95,7 +96,8 @@ const types = {
     booster,
     upgrader,
     automator,
-    investments
+    investments,
+    trashCan
 };
 
 /**
@@ -1017,19 +1019,20 @@ export const getInitialLayers = (
     player: Partial<Player>
 ): Array<GenericLayer> => {
     const layers: GenericLayer[] = [main];
-    let id = 0;
-    while (`portal-${id}` in (player.layers ?? {})) {
-        const layer = player.layers?.[`portal-${id}`] as LayerData<GenericPlane>;
-        layers.push(
-            createPlane(
-                `portal-${id}`,
-                layer.tier ?? "dirt",
-                layer.seed ?? Math.floor(Math.random() * 4294967296),
-                (layer.influences ?? []) as unknown as InfluenceState[]
-            )
-        );
-        id++;
-    }
+    (player.layers?.main as LayerData<typeof main>)?.board?.state?.nodes
+        ?.filter(node => node?.type === "portal")
+        .map(node => (node?.state as PortalState | undefined)?.id ?? "")
+        .forEach(id => {
+            const layer = player.layers?.[id] as LayerData<GenericPlane>;
+            layers.push(
+                createPlane(
+                    id,
+                    layer.tier ?? "dirt",
+                    layer.seed ?? Math.floor(Math.random() * 4294967296),
+                    (layer.influences ?? []) as unknown as InfluenceState[]
+                )
+            );
+        });
     return layers;
 };
 

@@ -6,7 +6,7 @@ import {
     Shape,
     getUniqueNodeID
 } from "features/boards/board";
-import { addLayer, layers } from "game/layers";
+import { addLayer, layers, removeLayer } from "game/layers";
 import player from "game/player";
 import Decimal from "lib/break_eternity";
 import { format, formatWhole } from "util/break_eternity";
@@ -166,6 +166,15 @@ export const factory = {
                     };
                     main.board.placeInAvailableSpace(newNode);
                     main.board.nodes.value.push(newNode);
+                    if (node.state === "iron") {
+                        const newNode = {
+                            id: getUniqueNodeID(main.board as GenericBoard),
+                            position: { ...node.position },
+                            type: "trashCan"
+                        };
+                        main.board.placeInAvailableSpace(newNode);
+                        main.board.nodes.value.push(newNode);
+                    }
                     main.board.selectedAction.value = null;
                     main.board.selectedNode.value = null;
                     node.state = undefined;
@@ -827,5 +836,39 @@ export const investments = {
     classes: node => ({
         running: isPowered(node)
     }),
+    draggable: true
+} as NodeTypeOptions;
+
+export const trashCan = {
+    shape: Shape.Diamond,
+    size: 50,
+    title: "🗑️",
+    label: node => {
+        if (node === main.board.selectedNode.value) {
+            return {
+                text: "Trash Can - Drag a portal to me!"
+            };
+        }
+        if (main.board.draggingNode.value?.type === "portal") {
+            const portal = (main.board.draggingNode.value.state as unknown as PortalState).id;
+            return {
+                text: `Delete ${(layers[portal] as GenericPlane).name}!`,
+                color: "var(--danger)"
+            };
+        }
+        return null;
+    },
+    canAccept: (node: BoardNode, otherNode: BoardNode) => {
+        return otherNode.type === "portal";
+    },
+    onDrop: (node, otherNode) => {
+        const portal = (otherNode.state as unknown as PortalState).id;
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        removeLayer(layers[portal]!);
+        delete player.layers[portal];
+        main.board.state.value.nodes = main.board.state.value.nodes.filter(
+            node => node !== otherNode
+        );
+    },
     draggable: true
 } as NodeTypeOptions;
