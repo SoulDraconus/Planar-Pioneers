@@ -54,7 +54,6 @@ import {
 import { GenericPlane, createPlane } from "./planes";
 import { main } from "./projEntry";
 import { exponentialFormat } from "util/bignum";
-import { ModalData } from "./help";
 
 export const mine = {
     shape: Shape.Diamond,
@@ -265,12 +264,10 @@ const romanNumerals = [
 export const resource = {
     shape: Shape.Circle,
     size: 50,
-    title: node =>
-        camelToTitle((node.state as unknown as ResourceState).type) +
-        " (" +
-        romanNumerals[resourceNames.indexOf((node.state as unknown as ResourceState).type)] +
-        ")",
+    title: node => camelToTitle((node.state as unknown as ResourceState).type),
     subtitle: node => formatWhole((node.state as unknown as ResourceState).amount),
+    otherSubtitle: node =>
+        romanNumerals[resourceNames.indexOf((node.state as unknown as ResourceState).type)],
     progress: node => getResourceLevelProgress((node.state as unknown as ResourceState).type),
     // Make clicking resources a no-op so they can't be selected
     // eslint-disable-next-line @typescript-eslint/no-empty-function
@@ -665,7 +662,7 @@ export const influence = {
             : Shape.Circle,
     size: 50,
     title: node => influences[(node.state as unknown as InfluenceState).type].display,
-    subtitle: node => {
+    otherSubtitle: node => {
         const cost = influences[(node.state as unknown as InfluenceState).type].cost;
         if (Decimal.lt(cost, 1e3)) {
             return `${formatWhole(cost)}x cost`;

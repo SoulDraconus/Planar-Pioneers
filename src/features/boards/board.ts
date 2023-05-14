@@ -92,6 +92,8 @@ export interface NodeTypeOptions {
     title: NodeComputable<string>;
     /** The subtitle to display for the node. */
     subtitle?: NodeComputable<string>;
+    /** The other subtitle to display for the node. */
+    otherSubtitle?: NodeComputable<string>;
     /** An optional label for the node. */
     label?: NodeComputable<NodeLabel | null>;
     /** The size of the node - diameter for circles, width and height for squares. */
@@ -144,6 +146,7 @@ export type NodeType<T extends NodeTypeOptions> = Replace<
     {
         title: GetComputableType<T["title"]>;
         subtitle: GetComputableType<T["subtitle"]>;
+        otherSubtitle: GetComputableType<T["otherSubtitle"]>;
         label: GetComputableType<T["label"]>;
         size: GetComputableTypeWithDefault<T["size"], 50>;
         style: GetComputableType<T["style"]>;
@@ -424,6 +427,7 @@ export function createBoard<T extends BoardOptions>(
 
             processComputable(nodeType as NodeTypeOptions, "title");
             processComputable(nodeType as NodeTypeOptions, "subtitle");
+            processComputable(nodeType as NodeTypeOptions, "otherSubtitle");
             processComputable(nodeType as NodeTypeOptions, "label");
             processComputable(nodeType as NodeTypeOptions, "size");
             setDefault(nodeType, "size", 50);

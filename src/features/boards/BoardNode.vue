@@ -111,10 +111,19 @@
                 />
             </g>
 
-            <text :fill="titleColor" class="node-title" :y="subtitle ? 10 : 0">{{ title }}</text>
-            <text v-if="subtitle" :fill="titleColor" class="node-subtitle" y="-15">{{
+            <text :fill="titleColor" class="node-title" :y="otherSubtitle && !subtitle ? -10 : 0">{{
+                title
+            }}</text>
+            <text v-if="subtitle" :fill="titleColor" class="node-subtitle" y="-25">{{
                 subtitle
             }}</text>
+            <text
+                v-if="otherSubtitle"
+                :fill="titleColor"
+                class="node-subtitle"
+                :y="subtitle ? 25 : 15"
+                >{{ otherSubtitle }}</text
+            >
         </g>
 
         <transition name="fade" appear>
@@ -212,6 +221,9 @@ const position = computed(() => {
 const shape = computed(() => getNodeProperty(props.nodeType.value.shape, unref(props.node)));
 const title = computed(() => getNodeProperty(props.nodeType.value.title, unref(props.node)));
 const subtitle = computed(() => getNodeProperty(props.nodeType.value.subtitle, unref(props.node)));
+const otherSubtitle = computed(() =>
+    getNodeProperty(props.nodeType.value.otherSubtitle, unref(props.node))
+);
 const label = computed(
     () =>
         (props.isSelected.value
