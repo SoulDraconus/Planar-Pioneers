@@ -53,6 +53,7 @@ import {
 } from "./data";
 import { GenericPlane, createPlane } from "./planes";
 import { main } from "./projEntry";
+import { exponentialFormat } from "util/bignum";
 
 export const mine = {
     shape: Shape.Diamond,
@@ -461,12 +462,19 @@ export const portalGenerator = {
             };
         } else if (draggingNode?.type === "influence") {
             const influence = (draggingNode.state as unknown as InfluenceState).type;
-            const { influences } = node.state as unknown as PortalGeneratorState;
-            if (influences.includes(influence)) {
+            const selectedInfluences = (node.state as unknown as PortalGeneratorState).influences;
+            if (selectedInfluences.includes(influence)) {
                 return { text: "Disconnect", color: "var(--accent2)" };
             }
+            const cost = influences[influence].cost;
+            let costDisplay;
+            if (Decimal.lt(cost, 1e3)) {
+                costDisplay = formatWhole(cost);
+            } else {
+                costDisplay = exponentialFormat(cost, 0);
+            }
             return {
-                text: "Add influence",
+                text: `Add influence (${costDisplay}x cost)`,
                 color: "var(--accent2)"
             };
         } else if (draggingNode?.type === "portal") {
@@ -650,6 +658,13 @@ export const influence = {
             : Shape.Circle,
     size: 50,
     title: node => influences[(node.state as unknown as InfluenceState).type].display,
+    subtitle: node => {
+        const cost = influences[(node.state as unknown as InfluenceState).type].cost;
+        if (Decimal.lt(cost, 1e3)) {
+            return `${formatWhole(cost)}x cost`;
+        }
+        return `${exponentialFormat(cost, 0)}x cost`;
+    },
     label: node => {
         if (node === main.board.selectedNode.value) {
             const state = node.state as unknown as InfluenceState;
