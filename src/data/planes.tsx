@@ -1471,6 +1471,12 @@ export function createPlane(
                     </StickyVue>
                     <SpacerVue height="60px" />
                     {renderableFeatures.value}
+                    {earnedTreasures.value.length + 1 < length ? (
+                        <div>
+                            +{formatWhole(length - earnedTreasures.value.length - 1)} remaining
+                            treasures
+                        </div>
+                    ) : null}
                     {render(modifiersModal)}
                 </>
             )),
