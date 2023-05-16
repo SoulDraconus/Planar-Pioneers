@@ -1009,7 +1009,8 @@ export const main = createLayer("main", function (this: BaseLayer) {
                             <h3 style="color: var(--accent1); text-shadow: 0px 0px 10px var(--accent1);">
                                 {formatWhole(numPoweredMachines.value)}
                             </h3>{" "}
-                            machines powered
+                            {Decimal.eq(numPoweredMachines.value, 1) ? "machine" : "machines"}{" "}
+                            powered
                         </span>
                     ) : null}
                     <span class="nav-segment">
