@@ -1,4 +1,4 @@
-import type { OptionsFunc, Replace } from "features/feature";
+import type { CoercableComponent, OptionsFunc, Replace } from "features/feature";
 import { setDefault } from "features/feature";
 import type { Resource } from "features/resources/resource";
 import Formula from "game/formulas/formulas";
@@ -12,6 +12,7 @@ import { createLazyProxy } from "util/proxies";
 import type { Ref } from "vue";
 import { computed, unref } from "vue";
 import { GenericDecorator } from "./decorators/common";
+import { createBooleanRequirement } from "game/requirements";
 
 /** An object that configures a {@link Conversion}. */
 export interface ConversionOptions {
@@ -291,4 +292,21 @@ export function setupPassiveGeneration(
                 .max(conversion.gainResource.value);
         }
     });
+}
+
+/**
+ * Creates requirement that is met when the conversion hits a specified gain amount
+ * @param conversion The conversion to check the gain amount of
+ * @param minGainAmount The minimum gain amount that must be met for the requirement to be met
+ */
+export function createCanConvertRequirement(
+    conversion: GenericConversion,
+    minGainAmount: Computable<DecimalSource> = 1,
+    display?: CoercableComponent
+) {
+    const computedMinGainAmount = convertComputable(minGainAmount);
+    return createBooleanRequirement(
+        () => Decimal.gte(unref(conversion.actualGain), unref(computedMinGainAmount)),
+        display
+    );
 }
