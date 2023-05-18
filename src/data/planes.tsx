@@ -96,7 +96,7 @@ export function createPlane(
         for (let i = 0; i < 12; i++) random();
 
         const name = getName(random);
-        const color = getColor([0.64, 0.75, 0.55], random);
+        const color = getColor([0.56, 0.74, 0.73], random);
         const background = getColor([0.18, 0.2, 0.25], random);
         const resource = createResource<DecimalSource>(0, getName(random));
         const timeActive = persistent<DecimalSource>(0);
@@ -487,7 +487,7 @@ export function createPlane(
                     break;
                 case "conversion": {
                     const prestigeResource = createResource(0, getName(random));
-                    const prestigeColor = getColor([0.64, 0.75, 0.55], random);
+                    const prestigeColor = getColor([0.56, 0.74, 0.73], random);
                     const cost = nextCost.value;
                     const costExponent = random() / 2 + 0.25; // Random from 0.25 - 0.75
                     const effectExponent = random() / 2 + 0.25; // ditto
@@ -660,7 +660,7 @@ export function createPlane(
                     );
                     previousGain = costFormula.evaluate();
                     n.value += 2;
-                    const barColor = getColor([0.64, 0.75, 0.55], random);
+                    const barColor = getColor([0.56, 0.74, 0.73], random);
                     const bar = createBar(() => ({
                         direction: Direction.Right,
                         width: 300,
@@ -719,7 +719,7 @@ export function createPlane(
                 case "dimensions": {
                     const title = getPowerName(random);
                     const energy = createResource<DecimalSource>(0, title + " energy");
-                    const energyColor = getColor([0.64, 0.75, 0.55], random);
+                    const energyColor = getColor([0.56, 0.74, 0.73], random);
                     const currentN = n.value;
                     const prevGain = previousGain;
                     costFormula = costFormula.add(

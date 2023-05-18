@@ -329,7 +329,11 @@ export function getPowerName(random: () => number) {
 
 export function getColor(base: [number, number, number], random: () => number) {
     const [h, s, v] = rgb2hsv(...base);
-    const [r, g, b] = hsv2rgb(Math.floor(random() * 360), s, v);
+    let newH = Math.floor(random() * 320);
+    if (newH > h - 20) {
+        newH += 40;
+    }
+    const [r, g, b] = hsv2rgb(newH, s, v);
     return `rgb(${r * 255}, ${g * 255}, ${b * 255})`;
 }
 
