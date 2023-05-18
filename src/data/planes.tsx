@@ -3,7 +3,7 @@ import SpacerVue from "components/layout/Spacer.vue";
 import StickyVue from "components/layout/Sticky.vue";
 import { GenericAchievement, createAchievement } from "features/achievements/achievement";
 import { createBar } from "features/bars/bar";
-import { BoardNode, getUniqueNodeID } from "features/boards/board";
+import { getUniqueNodeID } from "features/boards/board";
 import { GenericClickable, createClickable, setupAutoClick } from "features/clickables/clickable";
 import { createCumulativeConversion, setupPassiveGeneration } from "features/conversion";
 import {
@@ -47,7 +47,7 @@ import { createCostRequirement } from "game/requirements";
 import Decimal, { DecimalSource, format, formatWhole } from "util/bignum";
 import { Direction, WithRequired, camelToTitle } from "util/common";
 import { Computable, ProcessedComputable, convertComputable } from "util/computed";
-import { VueFeature, render, renderCol, renderRow, trackHover } from "util/vue";
+import { VueFeature, render, renderCol, renderJSX, renderRow, trackHover } from "util/vue";
 import { ComputedRef, Ref, computed, ref, unref } from "vue";
 import { useToast } from "vue-toastification";
 import { isEmpowered, isPowered } from "./boardUtils";
@@ -195,7 +195,7 @@ export function createPlane(
         // Makes cost formula value reactive on n, so nextCost will update as appropriate
         let costFormula = Formula.variable(n).times(0);
         let previousGain: DecimalSource = 0;
-        let visibility: Computable<boolean> = true;
+        let visibility: ProcessedComputable<boolean> = true;
         const nextCost = computed(() =>
             Decimal.add(difficulty, random() - 0.5)
                 .pow_base(2)
@@ -303,7 +303,11 @@ export function createPlane(
                                 title,
                                 description
                             },
-                            visibility: upgradeVisibility
+                            visibility: computed(
+                                () =>
+                                    earnedTreasures.value.length !== length &&
+                                    unref(upgradeVisibility)
+                            )
                         }));
                         prepareFeature({
                             feature: upgrade,
@@ -455,7 +459,11 @@ export function createPlane(
                                     effectDisplay: unref(effect),
                                     showAmount: false
                                 }),
-                                visibility: repeatableVisibility,
+                                visibility: computed(
+                                    () =>
+                                        earnedTreasures.value.length !== length &&
+                                        unref(repeatableVisibility)
+                                ),
                                 limit: 100,
                                 bonusAmount: () =>
                                     Decimal.gt(repeatable.amount.value, 0)
@@ -566,7 +574,11 @@ export function createPlane(
                         canClick: () => Decimal.gte(conversion.actualGain.value, 1),
                         prestigeResource,
                         onClick: conversion.convert,
-                        visibility: clickableVisibility
+                        visibility: computed(
+                            () =>
+                                earnedTreasures.value.length !== length &&
+                                unref(clickableVisibility)
+                        )
                     }));
                     const { isHovering } = prepareFeature({
                         feature: clickable,
@@ -669,7 +681,9 @@ export function createPlane(
                             Decimal.sub(xp.value, xpForCurrentLevel.value)
                                 .div(Decimal.sub(xpToNextLevel.value, xpForCurrentLevel.value))
                                 .toNumber(),
-                        visibility: barVisibility,
+                        visibility: computed(
+                            () => earnedTreasures.value.length !== length && unref(barVisibility)
+                        ),
                         xp,
                         display: jsx(() => (
                             <span>
@@ -811,7 +825,11 @@ export function createPlane(
                                     isEmpowered("diamondRelic") != null ? Decimal.dInf : 1,
                                 requiresPay: () => !isEmpowered("unobtainiumRelic")
                             })),
-                            visibility: repeatableVisibility
+                            visibility: computed(
+                                () =>
+                                    earnedTreasures.value.length !== length &&
+                                    unref(repeatableVisibility)
+                            )
                         }));
                         clickables.push(clickable);
                         const isHovering = trackHover(clickable);
@@ -875,7 +893,10 @@ export function createPlane(
                     features.push(clickables);
                     displays[i * 2] = jsx(() => (
                         <>
-                            {isVisible(repeatableVisibility) ? (
+                            {isVisible(
+                                earnedTreasures.value.length !== length &&
+                                    unref(repeatableVisibility)
+                            ) ? (
                                 <div style="margin: 10px">
                                     You have{" "}
                                     <h2
@@ -933,7 +954,10 @@ export function createPlane(
                                 reset.reset();
                             }
                         },
-                        visibility: upgradeVisibility,
+                        visibility: computed(
+                            () =>
+                                earnedTreasures.value.length !== length && unref(upgradeVisibility)
+                        ),
                         requirements: createCostRequirement(() => ({
                             resource: noPersist(resource),
                             cost,
@@ -1089,7 +1113,7 @@ export function createPlane(
                     resource: noPersist(resource),
                     cost
                 })),
-                visibility: milestoneVisibility,
+                visibility: computed(() => unref(milestoneVisibility)),
                 display: {
                     requirement: `${format(cost)} ${resource.displayName}`,
                     effectDisplay: description
@@ -1110,8 +1134,8 @@ export function createPlane(
                 direction: Direction.Down
             });
             features.push([milestone]);
-            // Wrap milestone.earned so it doesn't get reset
-            visibility = computed(() => milestone.earned.value);
+            visibility = milestone.earned;
+            displays[i * 2 + 1] = jsx(() => renderJSX(milestone));
         }
 
         const upgrades = findFeatures(
@@ -1399,6 +1423,7 @@ export function createPlane(
                 background,
                 "--background": background
             },
+            classes: { plane: true },
             features,
             resourceTabCollapsed,
             links,
@@ -1432,7 +1457,10 @@ export function createPlane(
                                     direction={Direction.Down}
                                     style={"width: 300px"}
                                 >
-                                    <h3>{influences.length} influences</h3>
+                                    <h3>
+                                        {influences.length} influence
+                                        {influences.length === 1 ? "" : "s"}
+                                    </h3>
                                 </TooltipVue>
                             </span>
                         )}
@@ -1446,28 +1474,35 @@ export function createPlane(
                             </button>
                         </span>
                     </StickyVue>
-                    <StickyVue class="nav-container">
-                        <span class="nav-segment">
-                            <h3 style={`color: ${color}; text-shadow: 0px 0px 10px ${color};`}>
-                                {render(resourcePreview)}
-                            </h3>{" "}
-                            {resource.displayName}
-                        </span>
-                        <span class="nav-segment">
-                            (
-                            <h3 style={`color: ${color}; text-shadow: 0px 0px 10px ${color};`}>
-                                {Decimal.gt(computedResourceGain.value, 0) ? "+" : ""}
-                                {render(resourceProductionPreview)}
-                            </h3>
-                            /s)
-                        </span>
-                        {Decimal.neq(computedPlanarSpeedModifier.value, 1) ? (
+                    {earnedTreasures.value.length === length ? null : (
+                        <StickyVue class="nav-container">
                             <span class="nav-segment">
-                                Speed: {format(computedPlanarSpeedModifier.value)}x
+                                <h3 style={`color: ${color}; text-shadow: 0px 0px 10px ${color};`}>
+                                    {render(resourcePreview)}
+                                </h3>{" "}
+                                {resource.displayName}
                             </span>
-                        ) : null}
-                    </StickyVue>
-                    <SpacerVue height="60px" />
+                            <span class="nav-segment">
+                                (
+                                <h3 style={`color: ${color}; text-shadow: 0px 0px 10px ${color};`}>
+                                    {Decimal.gt(computedResourceGain.value, 0) ? "+" : ""}
+                                    {render(resourceProductionPreview)}
+                                </h3>
+                                /s)
+                            </span>
+                            {Decimal.neq(computedPlanarSpeedModifier.value, 1) ? (
+                                <span class="nav-segment">
+                                    Speed: {format(computedPlanarSpeedModifier.value)}x
+                                </span>
+                            ) : null}
+                        </StickyVue>
+                    )}
+                    <SpacerVue height={earnedTreasures.value.length === length ? "30px" : "60px"} />
+                    {earnedTreasures.value.length === length ? (
+                        <div>
+                            <h1 style="color: var(--layer-color)">Plane Complete!</h1>
+                        </div>
+                    ) : null}
                     {renderableFeatures.value}
                     {earnedTreasures.value.length + 1 < length ? (
                         <div>
@@ -1483,7 +1518,14 @@ export function createPlane(
                     <span>{name}</span>
                     <span style="font-size: large; vertical-align: sub;">
                         {" "}
-                        {earnedTreasures.value.length}/{length} treasures
+                        {tier}-tier |{" "}
+                        {earnedTreasures.value.length === length ? (
+                            <span>Plane Complete</span>
+                        ) : (
+                            <span>
+                                {earnedTreasures.value.length}/{length} treasures
+                            </span>
+                        )}
                     </span>
                 </div>
             ))
