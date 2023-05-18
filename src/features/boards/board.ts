@@ -92,8 +92,6 @@ export interface NodeTypeOptions {
     title: NodeComputable<string>;
     /** The subtitle to display for the node. */
     subtitle?: NodeComputable<string>;
-    /** The other subtitle to display for the node. */
-    otherSubtitle?: NodeComputable<string>;
     /** An optional label for the node. */
     label?: NodeComputable<NodeLabel | null>;
     /** The size of the node - diameter for circles, width and height for squares. */
@@ -130,6 +128,11 @@ export interface NodeTypeOptions {
     onDrop?: (node: BoardNode, otherNode: BoardNode) => void;
     /** A function that is called for each node of this type every tick. */
     update?: (node: BoardNode, diff: number) => void;
+
+    // Custom properties
+    otherSubtitle?: NodeComputable<string>;
+    showStar?: NodeComputable<boolean>;
+    fillStar?: NodeComputable<boolean>;
 }
 
 /**
@@ -427,7 +430,6 @@ export function createBoard<T extends BoardOptions>(
 
             processComputable(nodeType as NodeTypeOptions, "title");
             processComputable(nodeType as NodeTypeOptions, "subtitle");
-            processComputable(nodeType as NodeTypeOptions, "otherSubtitle");
             processComputable(nodeType as NodeTypeOptions, "label");
             processComputable(nodeType as NodeTypeOptions, "size");
             setDefault(nodeType, "size", 50);
@@ -449,6 +451,11 @@ export function createBoard<T extends BoardOptions>(
             processComputable(nodeType as NodeTypeOptions, "titleColor");
             processComputable(nodeType as NodeTypeOptions, "actionDistance");
             setDefault(nodeType, "actionDistance", Math.PI / 6);
+
+            processComputable(nodeType as NodeTypeOptions, "otherSubtitle");
+            processComputable(nodeType as NodeTypeOptions, "showStar");
+            processComputable(nodeType as NodeTypeOptions, "fillStar");
+
             nodeType.nodes = computed(() =>
                 unref(processedBoard.state).nodes.filter(node => node.type === type)
             );

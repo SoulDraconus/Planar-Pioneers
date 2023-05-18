@@ -58,6 +58,14 @@
                     "
                     :stroke="progressColor"
                 />
+                <path
+                    d="m25,1 6,17h18l-14,11 5,17-15-10-15,10 5-17-14-11h18z"
+                    v-if="showStar"
+                    stroke="var(--bought)"
+                    :stroke-width="4"
+                    :fill="fillStar ? 'var(--bought)' : 'none'"
+                    :transform="`translate(${-size / 4}, ${-size - 10}), scale(0.5)`"
+                />
             </g>
             <g v-else-if="shape === Shape.Diamond" transform="rotate(45, 0, 0)">
                 <rect
@@ -220,7 +228,6 @@ const position = computed(() => {
 
 const shape = computed(() => getNodeProperty(props.nodeType.value.shape, unref(props.node)));
 const title = computed(() => getNodeProperty(props.nodeType.value.title, unref(props.node)));
-const subtitle = computed(() => getNodeProperty(props.nodeType.value.subtitle, unref(props.node)));
 const otherSubtitle = computed(() =>
     getNodeProperty(props.nodeType.value.otherSubtitle, unref(props.node))
 );
@@ -286,6 +293,10 @@ function mouseUp(e: MouseEvent | TouchEvent) {
         e.stopPropagation();
     }
 }
+
+const subtitle = computed(() => getNodeProperty(props.nodeType.value.subtitle, unref(props.node)));
+const showStar = computed(() => getNodeProperty(props.nodeType.value.showStar, unref(props.node)));
+const fillStar = computed(() => getNodeProperty(props.nodeType.value.fillStar, unref(props.node)));
 </script>
 
 <style scoped>

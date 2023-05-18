@@ -286,7 +286,10 @@ export const resource = {
                 1
             )
     }),
-    draggable: true
+    draggable: true,
+    showStar: node => (node.state as unknown as ResourceState).type in main.toolNodes.value,
+    fillStar: node =>
+        `${(node.state as unknown as ResourceState).type}Relic` in main.toolNodes.value
 } as NodeTypeOptions;
 
 export const passive = {
