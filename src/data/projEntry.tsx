@@ -738,7 +738,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
             glowColor(): string {
                 return modifierTabs.activeTab.value === this.tab ? "white" : "";
             },
-            visibility: () => Object.keys(toolNodes.value).length > 0,
+            visibility: () => Object.values(toolNodes.value).filter(n => n != null).length > 0,
             tab: miningTab,
             miningTabCollapsed
         }),
