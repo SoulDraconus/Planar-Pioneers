@@ -978,6 +978,7 @@ export const main = createLayer("main", function (this: BaseLayer) {
         resourceNodes,
         toolNodes,
         influenceNodes,
+        portalNodes,
         grantResource,
         activePortals,
         nextPowerCost,

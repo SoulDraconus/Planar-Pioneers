@@ -1411,6 +1411,16 @@ export function createPlane(
             );
         });
 
+        const findNode = createClickable(() => ({
+            display: {
+                description: "Select Portal Node"
+            },
+            onClick() {
+                main.board.selectedNode.value = main.portalNodes.value[id];
+            },
+            style: "min-height: 30px; width: 200px; margin-bottom: 20px"
+        }));
+
         return {
             tier: persistent(tier),
             seed: persistent(seed),
@@ -1498,6 +1508,7 @@ export function createPlane(
                         </StickyVue>
                     )}
                     <SpacerVue height={earnedTreasures.value.length === length ? "30px" : "60px"} />
+                    {render(findNode)}
                     {earnedTreasures.value.length === length ? (
                         <div>
                             <h1 style="color: var(--layer-color)">Plane Complete!</h1>

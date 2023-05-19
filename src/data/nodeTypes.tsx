@@ -657,7 +657,12 @@ export const portal = {
     }),
     outlineColor: node =>
         (layers[(node.state as unknown as PortalState).id] as GenericPlane).background,
-    draggable: true
+    draggable: true,
+    onClick(node) {
+        main.board.selectedNode.value = node;
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        layers[(node.state as unknown as PortalState).id]!.minimized.value = false;
+    }
 } as NodeTypeOptions;
 
 export const influence = {
