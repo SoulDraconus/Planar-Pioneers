@@ -180,7 +180,11 @@ export const main = createLayer("main", function (this: BaseLayer) {
                 () => resourceLevels.value[resource],
                 (level, prevLevel) => {
                     const diff = Decimal.sub(level, prevLevel);
-                    if (Decimal.gt(diff, 1) && settings.active === player.id) {
+                    if (
+                        (Decimal.eq(level, 1) || Decimal.gt(diff, 1)) &&
+                        Decimal.gt(diff, Decimal.div(prevLevel, 100)) &&
+                        settings.active === player.id
+                    ) {
                         toast.info(
                             <div>
                                 <h3>
