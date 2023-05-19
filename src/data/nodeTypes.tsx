@@ -287,7 +287,7 @@ export const resource = {
             )
     }),
     draggable: true,
-    showStar: node => (node.state as unknown as ResourceState).type in main.toolNodes.value,
+    showStar: node => main.toolNodes.value[(node.state as unknown as ResourceState).type] != null,
     fillStar: node =>
         `${(node.state as unknown as ResourceState).type}Relic` in main.toolNodes.value
 } as NodeTypeOptions;
